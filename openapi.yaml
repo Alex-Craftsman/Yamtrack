@@ -1,0 +1,597 @@
+openapi: 3.0.0
+info:
+  title: Yamtrack API
+  version: 0.0.1
+  description: Initial API for Yamtrack.
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+security:
+  - bearerAuth: []
+tags:
+  - name: media
+  - name: search
+  - name: statistics
+  - name: lists
+  - name: calendar
+paths:
+  /api/v1/calendar:
+    get:
+      tags:
+        - calendar
+      summary: List upcoming calendar events
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEvent"
+  /api/v1/lists:
+    get:
+      tags:
+        - lists
+      summary: List the user's custom lists
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomList"
+    post:
+      tags:
+        - lists
+      summary: Create a new list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateList"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomList"
+  /api/v1/lists/{id}:
+    get:
+      tags:
+        - lists
+      summary: Get list details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomListDetail"
+    patch:
+      tags:
+        - lists
+      summary: Edit a list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateList"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomList"
+    delete:
+      tags:
+        - lists
+      summary: Delete a list
+      responses:
+        "204":
+          description: Deleted
+  /api/v1/lists/{id}/items:
+    post:
+      tags:
+        - lists
+      summary: Add an Item to a list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                item_id:
+                  type: integer
+              required:
+                - item_id
+      responses:
+        "204":
+          description: Added
+  /api/v1/lists/{id}/items/{item_id}:
+    delete:
+      tags:
+        - lists
+      summary: Remove an Item from a list
+      responses:
+        "204":
+          description: Removed
+  /api/v1/media:
+    get:
+      tags:
+        - media
+      summary: List tracked media for the authenticated user
+      parameters:
+        - in: query
+          name: type
+          schema:
+            $ref: "#/components/schemas/MediaType"
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/MediaStatus"
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Case-insensitive substring search on item title
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+  /api/v1/media/{type}:
+    get:
+      tags:
+        - media
+      summary: List tracked media of a given type for the authenticated user
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaType"
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/MediaStatus"
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+    post:
+      tags:
+        - media
+      summary: Create a custom media item of a given type (manual source)
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaType"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomMediaOfType"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "400":
+          description: Bad Request
+  /api/v1/media/{type}/{id}:
+    get:
+      tags:
+        - media
+      summary: Retrieve a tracked media item by type and instance ID
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaType"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Media"
+        "404":
+          description: Not Found
+    patch:
+      tags:
+        - media
+      summary: Edit user fields (score, status, progress, dates)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMedia"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Media"
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+    delete:
+      tags:
+        - media
+      summary: Delete a tracked media instance
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+  /api/v1/media/{type}/{id}/history:
+    get:
+      tags:
+        - media
+      summary: Get history records for a media instance
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HistoryRecord"
+  /api/v1/media/{type}/{id}/lists:
+    post:
+      tags:
+        - lists
+      summary: Add the item's Item to a list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                list_id:
+                  type: integer
+              required:
+                - list_id
+      responses:
+        "204":
+          description: Added
+    delete:
+      tags:
+        - lists
+      summary: Remove the item's Item from a list
+      parameters:
+        - in: query
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+  /api/v1/media/{type}/{id}/sync:
+    post:
+      tags:
+        - media
+      summary: Sync metadata from provider (non-manual sources)
+      responses:
+        "202":
+          description: Sync triggered
+        "400":
+          description: Cannot sync manual items
+  /api/v1/search/{type}:
+    get:
+      tags:
+        - search
+      summary: Search external providers for media
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaType"
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: source
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchResult"
+  /api/v1/statistics:
+    get:
+      tags:
+        - statistics
+      summary: Get statistics for the authenticated user
+      parameters:
+        - in: query
+          name: type
+          schema:
+            $ref: "#/components/schemas/MediaType"
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/MediaStatus"
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum:
+              - all
+              - year
+              - month
+              - week
+            default: year
+      responses:
+        "200":
+          description: OK
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    CalendarEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        datetime:
+          type: string
+          format: date-time
+        title:
+          type: string
+        item:
+          $ref: "#/components/schemas/Item"
+    CreateCustomMediaOfType:
+      type: object
+      properties:
+        title:
+          type: string
+        image:
+          type: string
+      required:
+        - title
+    CreateList:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+        - name
+    CustomList:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+    CustomListDetail:
+      allOf:
+        - $ref: "#/components/schemas/CustomList"
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Item"
+    HistoryRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        history_date:
+          type: string
+          format: date-time
+        changes:
+          type: object
+          additionalProperties: true
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+        media_id:
+          type: string
+        source:
+          $ref: "#/components/schemas/Source"
+        media_type:
+          $ref: "#/components/schemas/MediaType"
+        title:
+          type: string
+        image:
+          type: string
+        season_number:
+          type: integer
+          nullable: true
+        episode_number:
+          type: integer
+          nullable: true
+    Media:
+      type: object
+      properties:
+        id:
+          type: integer
+        item:
+          $ref: "#/components/schemas/Item"
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+    MediaStatus:
+      type: string
+      enum:
+        - Completed
+        - In progress
+        - Planning
+        - Paused
+        - Dropped
+    MediaType:
+      type: string
+      enum:
+        - tv
+        - season
+        - episode
+        - movie
+        - anime
+        - manga
+        - game
+        - book
+        - comic
+    PaginatedMedia:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Media"
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        source:
+          $ref: "#/components/schemas/Source"
+        media_type:
+          $ref: "#/components/schemas/MediaType"
+        image:
+          type: string
+        external_id:
+          type: string
+    Source:
+      type: string
+      enum:
+        - tmdb
+        - mal
+        - mangaupdates
+        - igdb
+        - openlibrary
+        - hardcover
+        - comicvine
+        - manual
+    UpdateList:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    UpdateMedia:
+      type: object
+      properties:
+        score:
+          type: number
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
