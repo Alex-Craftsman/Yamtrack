@@ -22,6 +22,7 @@ urlpatterns = [
     path("", include("events.urls")),
     path("select2/", include("django_select2.urls")),
     path("health/", decorator_include(login_not_required, "health_check.urls")),
+    path("api/v1/", include("api.urls")),
 ]
 
 # Build the accounts URLs

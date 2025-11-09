@@ -1,0 +1,545 @@
+from django.db import IntegrityError
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+from django.utils.timezone import datetime
+from rest_framework import permissions
+from rest_framework import views as drf_views
+from rest_framework.response import Response
+
+from app.forms import ManualItemForm, get_form_class
+from app.models import Item, MediaTypes, Sources
+from app.providers import services
+from app.statistics import (
+    get_activity_data,
+    get_media_type_distribution,
+    get_score_distribution,
+    get_status_distribution,
+    get_status_pie_chart_data,
+    get_timeline,
+    get_user_media,
+)
+from users.models import MediaStatusChoices
+
+from .helpers import (
+    EPISODES_ADDITIONAL_SORTS,
+    EXISTING_SORTS,
+    MANUAL_SORTS,
+    MEDIA_TYPE_MODEL_MAP,
+    MEDIA_TYPE_VALID_LIST,
+    SEASONS_ADDITIONAL_SORTS,
+    apply_aggregated_sort,
+    apply_manual_sort_for_type,
+    fetch_media_list,
+    get_media_status,
+    make_page_url,
+    paginate_data,
+    parse_limit_offset,
+    parse_sort_filter,
+)
+from .serializers import MediaSerializer, TimelineItemSerializer
+
+
+# /api/v1/media/
+class MediaListView(drf_views.APIView):
+    """Retrieve the list of media for the authenticated user."""
+
+    serializer_class = MediaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        # TODO: check progress sort might not be working
+        user = request.user
+        media_type = request.GET.get("media_type")
+        status = request.GET.get("status", "")
+        search = request.GET.get("search", "")
+        sort_filter = request.GET.get("sort", "")
+        exclude = (
+            request.GET.get("exclude", "").split(",")
+            if request.GET.get("exclude")
+            else []
+        )
+
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        if not status:
+            status = MediaStatusChoices.ALL
+        else:
+            try:
+                status = get_media_status(int(status))
+            except (TypeError, ValueError):
+                return Response({"detail": "Not Found. Invalid status"}, status=404)
+
+        results = []
+        sort, sort_order = parse_sort_filter(sort_filter)
+        sorted = False
+
+        if media_type:
+            if media_type in MEDIA_TYPE_VALID_LIST:
+                sort_list = EXISTING_SORTS
+                if media_type == "season":
+                    sort_list += SEASONS_ADDITIONAL_SORTS
+                elif media_type == "episode":
+                    sort_list += EPISODES_ADDITIONAL_SORTS
+
+                if sort in sort_list:
+                    media_sort = sort
+                    sorted = True
+                else:
+                    media_sort = ""
+
+                results.extend(
+                    fetch_media_list(user, media_type, status, media_sort, search),
+                )
+
+                if not sorted and sort != "":
+                    if sort in MANUAL_SORTS:
+                        results = apply_manual_sort_for_type(results, sort)
+                        if isinstance(results, Response):
+                            return results
+                    else:
+                        return Response(
+                            {"detail": "Not Found. Invalid sorting"},
+                            status=404,
+                        )
+            else:
+                return Response({"detail": "Not Found. Invalid media type"}, status=404)
+        else:
+            excluded_set = {e.strip().lower() for e in exclude if e and e.strip()}
+            allowed_types = [
+                t
+                for t in MEDIA_TYPE_VALID_LIST
+                if t is not MediaTypes.EPISODE.value and t not in excluded_set
+            ]
+
+            for t in allowed_types:
+                results.extend(fetch_media_list(user, t, status, "", search))
+
+            if sort != "":
+                sort_list = EXISTING_SORTS + MANUAL_SORTS
+                if sort in sort_list:
+                    results = apply_aggregated_sort(results, sort)
+                    if isinstance(results, Response):
+                        return results
+                else:
+                    return Response(
+                        {"detail": "Not Found. Invalid sorting"},
+                        status=404,
+                    )
+
+        if sort_order == "desc":
+            results.reverse()
+
+        paginated_data = paginate_data(request, results, limit, offset)
+        return Response(paginated_data)
+
+
+# /api/v1/media/[media_type]/
+class MediaTypeListView(drf_views.APIView):
+    serializer_class = MediaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type):
+        user = request.user
+        status = request.GET.get("status", "")
+        search = request.GET.get("search", "")
+        sort_filter = request.GET.get("sort", "")
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        if not status:
+            status = MediaStatusChoices.ALL
+        else:
+            try:
+                status = get_media_status(int(status))
+            except (TypeError, ValueError):
+                return Response({"detail": "Not Found. Invalid status"}, status=404)
+
+        results = []
+        sort, sort_order = parse_sort_filter(sort_filter)
+        sorted = False
+
+        if media_type not in MEDIA_TYPE_VALID_LIST:
+            return Response({"detail": "Bad Request. Invalid type."}, status=400)
+
+        sort_list = EXISTING_SORTS
+        if media_type == "season":
+            sort_list += SEASONS_ADDITIONAL_SORTS
+        elif media_type == "episode":
+            sort_list += EPISODES_ADDITIONAL_SORTS
+
+        if sort in sort_list:
+            media_sort = sort
+            sorted = True
+        else:
+            media_sort = ""
+
+        results = fetch_media_list(user, media_type, status, media_sort, search)
+
+        if not sorted and sort != "":
+            if sort in MANUAL_SORTS:
+                results = apply_manual_sort_for_type(results, sort)
+                if isinstance(results, Response):
+                    return results
+            else:
+                return Response(
+                    {"detail": "Not Found. Invalid sorting"},
+                    status=404,
+                )
+
+        if sort_order == "desc":
+            results.reverse()
+
+        paginated_data = paginate_data(request, results, limit, offset)
+        return Response(paginated_data)
+
+    def post(self, request, media_type):
+        if media_type not in MEDIA_TYPE_VALID_LIST:
+            return Response({"detail": "Bad Request. Invalid type."}, status=400)
+
+        if not request.data:
+            return Response({"detail": "Bad Request. Missing body."}, status=400)
+
+        body = request.data
+        body["media_type"] = media_type
+        body["status"] = (
+            get_media_status(body["status"])
+            if "status" in body
+            else MediaStatusChoices.PLANNING
+        )
+
+        source = body.get("source", Sources.MANUAL.value)
+
+        if str(source) == Sources.MANUAL.value:
+            form = ManualItemForm(body, user=request.user)
+            if not form.is_valid():
+                return Response(
+                    {"detail": "Bad Request.", "errors": form.errors},
+                    status=400,
+                )
+
+            try:
+                item = form.save()
+            except IntegrityError:
+                media_name = form.cleaned_data.get("title", "item")
+                if form.cleaned_data.get("season_number"):
+                    media_name += f" - Season {form.cleaned_data['season_number']}"
+                if form.cleaned_data.get("episode_number"):
+                    media_name += f" - Episode {form.cleaned_data['episode_number']}"
+                return Response(
+                    {"detail": f"Conflict. {media_name} already exists."},
+                    status=409,
+                )
+
+            media_data = dict(body)
+            media_data.update({"source": item.source, "media_id": item.media_id})
+            media_form = get_form_class(item.media_type)(media_data)
+            if not media_form.is_valid():
+                item.delete()
+                return Response(
+                    {"detail": "Bad Request.", "errors": media_form.errors},
+                    status=400,
+                )
+
+            media_form.instance.user = request.user
+            media_form.instance.item = item
+            if item.media_type == MediaTypes.SEASON.value:
+                media_form.instance.related_tv = form.cleaned_data.get("parent_tv")
+            elif item.media_type == MediaTypes.EPISODE.value:
+                media_form.instance.related_season = form.cleaned_data.get(
+                    "parent_season",
+                )
+
+            media_form.save()
+            serializer = MediaSerializer(media_form.instance)
+            return Response(serializer.data, status=201)
+
+        media_id = body.get("media_id")
+        if not media_id:
+            return Response(
+                {"detail": "Bad Request. 'media_id' is required for provider sources."},
+                status=400,
+            )
+
+        season_number = body.get("season_number")
+
+        try:
+            metadata = services.get_media_metadata(
+                media_type,
+                media_id,
+                source,
+                [season_number],
+            )
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        defaults = {"title": metadata.get("title"), "image": metadata.get("image")}
+        item, _ = Item.objects.get_or_create(
+            media_id=media_id,
+            source=source,
+            media_type=media_type,
+            season_number=season_number,
+            defaults=defaults,
+        )
+
+        try:
+            item.save()
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error.", "errors": str(e)},
+                status=500,
+            )
+
+        model = MEDIA_TYPE_MODEL_MAP.get(media_type)
+        if model is None:
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        instance = model(item=item, user=request.user)
+
+        media_data = dict(body)
+        media_data.update({"source": item.source, "media_id": item.media_id})
+        media_form = get_form_class(media_type)(media_data, instance=instance)
+        if not media_form.is_valid():
+            return Response(
+                {"detail": "Bad Request.", "errors": media_form.errors},
+                status=400,
+            )
+
+        media_form.save()
+        serializer = MediaSerializer(media_form.instance)
+        return Response(serializer.data, status=201)
+
+
+# /api/v1/media/[media_type]/[source]/[id]
+class MediaDetailView(drf_views.APIView):
+    serializer_class = MediaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, id):
+        return Response({"detail": "Not Implemented"}, status=501)
+
+    def patch(self, request, media_type, source, id):
+        return Response({"detail": "Not Implemented"}, status=501)
+
+    def delete(self, request, media_type, source, id):
+        return Response({"detail": "Not Implemented"}, status=501)
+
+
+# /api/v1/media/[media_type]/[source]/[id]/history
+class MediaHistoryView(drf_views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/media/[media_type]/[source]/[id]/sync
+class MediaSyncView(drf_views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, media_type, source, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/media/[media_type]/[source]/[id]/lists
+class MediaAddToListView(drf_views.APIView):
+    def post(self, request, media_type, source, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+    def delete(self, request, media_type, source, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/search/[media_type]
+class SearchProviderView(drf_views.APIView):
+    def get(self, request, media_type):
+        search = request.GET.get("search", "")
+        source = request.GET.get("source", None)
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        if media_type not in MEDIA_TYPE_VALID_LIST:
+            return Response({"detail": "Bad Request. Invalid type."}, status=400)
+        if media_type in ("season", "episode"):
+            return Response(
+                {"detail": f"Bad Request. Search for {media_type} is not supported."},
+            )
+
+        if source == Sources.MANUAL.value:
+            return Response(
+                {"detail": "Bad Request. Search for manual source is not supported."},
+                status=400,
+            )
+
+        results_accum = []
+        page = 1
+        last_response = None
+
+        try:
+            while True:
+                last_response = services.search(media_type, search, page, source)
+                if (
+                    not isinstance(last_response, dict)
+                    or "results" not in last_response
+                ):
+                    break
+                page_results = last_response.get("results", []) or []
+                results_accum.extend(page_results)
+                if len(results_accum) >= offset + limit:
+                    break
+                total_pages = last_response.get("total_pages")
+                if total_pages and page >= total_pages:
+                    break
+                if not page_results:
+                    break
+
+                page += 1
+
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        total = (
+            last_response.get("total_results")
+            if isinstance(last_response, dict)
+            else len(results_accum)
+        )
+
+        sliced = results_accum[offset : offset + limit]
+        next_url = None
+        prev_url = None
+        if offset + limit < (total or len(results_accum)):
+            next_url = make_page_url(request, limit, offset + limit)
+        if offset > 0:
+            prev_offset = max(0, offset - limit)
+            prev_url = make_page_url(request, limit, prev_offset)
+
+        payload = {
+            "pagination": {
+                "total": total or len(results_accum),
+                "limit": limit,
+                "offset": offset,
+                "next": next_url,
+                "previous": prev_url,
+            },
+            "results": sliced,
+        }
+
+        return Response(payload)
+
+
+# /api/v1/statistics
+class StatisticsView(drf_views.APIView):
+    # TODO: Possibly don't use WebUI needed statistics but compute them for API
+
+    def get(self, request):
+        timeformat = "%Y-%m-%d"
+        today = timezone.localdate()
+        one_year_ago = today.replace(year=today.year - 1).strftime(timeformat)
+        today = today.strftime(timeformat)
+
+        user = request.user
+        start_date = request.GET.get("start_date", one_year_ago)
+        end_date = request.GET.get("end_date", today)
+
+        if start_date == "all" and end_date == "all":
+            start_date = None
+            end_date = None
+        else:
+            start_date = parse_date(start_date)
+            end_date = parse_date(end_date)
+
+            if start_date and end_date:
+                start_date = timezone.make_aware(
+                    datetime.combine(start_date, datetime.min.time()),
+                )
+                end_date = timezone.make_aware(
+                    datetime.combine(end_date, datetime.max.time()),
+                )
+        user_media, media_count = get_user_media(
+            user,
+            start_date,
+            end_date,
+        )
+        media_type_distribution = get_media_type_distribution(
+            media_count,
+        )
+        score_distribution, top_rated = get_score_distribution(user_media)
+        status_distribution = get_status_distribution(user_media)
+        status_pie_chart_data = get_status_pie_chart_data(
+            status_distribution,
+        )
+        timeline = get_timeline(user_media)
+        activity_data = get_activity_data(request.user, start_date, end_date)
+
+        statistics = {
+            "start_date": start_date,
+            "end_date": end_date,
+            "media_count": media_count,
+            "activity_data": activity_data,
+            "media_type_distribution": media_type_distribution,
+            "score_distribution": score_distribution,
+            "top_rated": MediaSerializer(top_rated, many=True).data,
+            "status_distribution": status_distribution,
+            "status_pie_chart_data": status_pie_chart_data,
+            "timeline": {
+                month: TimelineItemSerializer(
+                    items,
+                    many=True,
+                    context={"request": request},
+                ).data
+                for month, items in (timeline or {}).items()
+            },
+        }
+
+        return Response(statistics, status=200)
+
+
+# /api/v1/lists
+class ListsView(drf_views.APIView):
+    def get(self, request):
+        return Response({"detail": "Not implemented"}, status=501)
+
+    def post(self, request):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/lists/[id]
+class ListDetailView(drf_views.APIView):
+    def get(self, request, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+    def patch(self, request, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+    def delete(self, request, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/lists/[id]/items
+class ListAddItemView(drf_views.APIView):
+    def post(self, request, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/lists/[id]/items/[item_id]
+class ListRemoveItemView(drf_views.APIView):
+    def delete(self, request, id, item_id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/calendar
+class CalendarView(drf_views.APIView):
+    def get(self, request):
+        return Response({"detail": "Not implemented"}, status=501)

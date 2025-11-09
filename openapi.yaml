@@ -1,21 +1,22 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.1
+  version: 0.0.2
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
     description: Local development server
 security:
+  - ApiKeyAuth: []
   - bearerAuth: []
 tags:
+  - name: calendar
+  - name: lists
   - name: media
   - name: search
   - name: statistics
-  - name: lists
-  - name: calendar
 paths:
-  /api/v1/calendar:
+  /api/v1/calendar/:
     get:
       tags:
         - calendar
@@ -23,13 +24,7 @@ paths:
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CalendarEvent"
-  /api/v1/lists:
+  /api/v1/lists/:
     get:
       tags:
         - lists
@@ -37,12 +32,6 @@ paths:
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CustomList"
     post:
       tags:
         - lists
@@ -52,15 +41,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateList"
+              type: object
       responses:
         "201":
           description: Created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CustomList"
-  /api/v1/lists/{id}:
+  /api/v1/lists/{id}/:
     get:
       tags:
         - lists
@@ -74,128 +59,122 @@ paths:
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CustomListDetail"
     patch:
       tags:
         - lists
       summary: Edit a list
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateList"
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CustomList"
-    delete:
-      tags:
-        - lists
-      summary: Delete a list
-      responses:
-        "204":
-          description: Deleted
-  /api/v1/lists/{id}/items:
-    post:
-      tags:
-        - lists
-      summary: Add an Item to a list
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              properties:
-                item_id:
-                  type: integer
-              required:
-                - item_id
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags:
+        - lists
+      summary: Delete a list
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+  /api/v1/lists/{id}/items/:
+    post:
+      tags:
+        - lists
+      summary: Add an Item to a list
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "204":
           description: Added
-  /api/v1/lists/{id}/items/{item_id}:
+  /api/v1/lists/{id}/items/{item_id}/:
     delete:
       tags:
         - lists
       summary: Remove an Item from a list
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: item_id
+          required: true
+          schema:
+            type: integer
       responses:
         "204":
           description: Removed
-  /api/v1/media:
+  /api/v1/media/:
     get:
       tags:
         - media
       summary: List tracked media for the authenticated user
       parameters:
         - in: query
-          name: type
-          schema:
-            $ref: "#/components/schemas/MediaType"
-        - in: query
-          name: status
-          schema:
-            $ref: "#/components/schemas/MediaStatus"
-        - in: query
-          name: q
+          name: exclude
           schema:
             type: string
-          description: Case-insensitive substring search on item title
+          description: Comma-separated list of media types to exclude
         - in: query
           name: limit
           schema:
             type: integer
             minimum: 1
             default: 20
+          description: "Maximum number of items to return (default: 20)"
         - in: query
           name: offset
           schema:
             type: integer
             minimum: 0
             default: 0
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedMedia"
-  /api/v1/media/{type}:
-    get:
-      tags:
-        - media
-      summary: List tracked media of a given type for the authenticated user
-      parameters:
-        - in: path
-          name: type
-          required: true
-          schema:
-            $ref: "#/components/schemas/MediaType"
+          description: "Offset for pagination (default: 0)"
         - in: query
-          name: q
+          name: search
           schema:
             type: string
+          description: Case-insensitive substring search on item title
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/SortOptions"
+          description: Sort order for results
         - in: query
           name: status
           schema:
             $ref: "#/components/schemas/MediaStatus"
+          description: Filter by media status
         - in: query
-          name: limit
+          name: media_type
           schema:
-            type: integer
-            default: 20
-        - in: query
-          name: offset
-          schema:
-            type: integer
-            default: 0
+            $ref: "#/components/schemas/CompleteMediaType"
+          description: Filter by media type
       responses:
         "200":
           description: OK
@@ -203,22 +182,109 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaginatedMedia"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/:
+    get:
+      tags:
+        - media
+      summary: List tracked media of a given media type for the authenticated user
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/CompleteMediaType"
+          description: Filter by media type
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Case-insensitive substring search on item title
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/SortOptions"
+          description: Sort order for results
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/MediaStatus"
+          description: Filter by media status
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     post:
       tags:
         - media
-      summary: Create a custom media item of a given type (manual source)
+      summary: Create a media item of a given media type
+      description: |
+        Create a new tracked media item. 
+        For manual creations set `source` to `manual` and omit `media_id`.
+        For provider creations set `source` to the provider name (eg. `tmdb`) and
+        provide `media_id`. Provider metadata (title/image) will overwrite any
+        existing values when creating or updating the Item.
       parameters:
         - in: path
-          name: type
+          name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/MediaType"
+            $ref: "#/components/schemas/CompleteMediaType"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateCustomMediaOfType"
+              $ref: "#/components/schemas/CreateMedia"
+            examples:
+              manual:
+                summary: Manual creation (custom item)
+                value:
+                  source: "manual"
+                  title: "My Custom Movie"
+                  image: "https://example.com/poster.jpg"
+                  score: 8.5
+                  status: 3
+                  progress: 1
+                  start_date: "2023-10-01T00:00:00Z"
+                  end_date: "2023-10-01T00:00:00Z"
+                  notes: "Watched at the festival"
+              provider:
+                summary: Provider-based creation (fetch metadata)
+                value:
+                  source: "tmdb"
+                  media_id: "12345"
+                  season_number: 1
+                  score: 9
+                  status: 1
       responses:
         "201":
           description: Created
@@ -228,17 +294,32 @@ paths:
                 $ref: "#/components/schemas/Item"
         "400":
           description: Bad Request
-  /api/v1/media/{type}/{id}:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{id}/:
     get:
       tags:
         - media
-      summary: Retrieve a tracked media item by type and instance ID
+      summary: Retrieve a tracked media item by media type, source and media id
       parameters:
         - in: path
-          name: type
+          name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/MediaType"
+            $ref: "#/components/schemas/CompleteMediaType"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
         - in: path
           name: id
           required: true
@@ -247,29 +328,39 @@ paths:
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Media"
+        "400":
+          description: Bad Request
         "404":
           description: Not Found
     patch:
       tags:
         - media
       summary: Edit user fields (score, status, progress, dates)
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/CompleteMediaType"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateMedia"
+              type: object
       responses:
         "200":
           description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Media"
         "400":
           description: Bad Request
         "404":
@@ -277,42 +368,85 @@ paths:
     delete:
       tags:
         - media
-      summary: Delete a tracked media instance
+      summary: Delete a tracked media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/CompleteMediaType"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
       responses:
         "204":
           description: No Content
+        "400":
+          description: Bad Request
         "404":
           description: Not Found
-  /api/v1/media/{type}/{id}/history:
+  /api/v1/media/{media_type}/{source}/{id}/history/:
     get:
       tags:
         - media
-      summary: Get history records for a media instance
+      summary: Get history records for a media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/CompleteMediaType"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
       responses:
         "200":
           description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/HistoryRecord"
-  /api/v1/media/{type}/{id}/lists:
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+  /api/v1/media/{media_type}/{source}/{id}/lists/:
     post:
       tags:
         - lists
       summary: Add the item's Item to a list
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/CompleteMediaType"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              properties:
-                list_id:
-                  type: integer
-              required:
-                - list_id
       responses:
         "204":
           description: Added
@@ -321,6 +455,21 @@ paths:
         - lists
       summary: Remove the item's Item from a list
       parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/CompleteMediaType"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
         - in: query
           name: list_id
           required: true
@@ -329,146 +478,117 @@ paths:
       responses:
         "204":
           description: Removed
-  /api/v1/media/{type}/{id}/sync:
+  /api/v1/media/{media_type}/{source}/{id}/sync/:
     post:
       tags:
         - media
       summary: Sync metadata from provider (non-manual sources)
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/CompleteMediaType"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
       responses:
         "202":
           description: Sync triggered
-        "400":
-          description: Cannot sync manual items
-  /api/v1/search/{type}:
+  /api/v1/search/{media_type}/:
     get:
       tags:
         - search
-      summary: Search external providers for media
+      summary: Search for media items across supported providers
       parameters:
         - in: path
-          name: type
-          required: true
+          name: media_type
           schema:
             $ref: "#/components/schemas/MediaType"
+          description: Media type to search for
+          required: true
         - in: query
-          name: q
+          name: search
           required: true
           schema:
             type: string
+          description: Search query string
         - in: query
           name: source
           schema:
             $ref: "#/components/schemas/Source"
+          description: The specific source of the media type to query
         - in: query
-          name: page
+          name: limit
           schema:
             type: integer
-            default: 1
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  results:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/SearchResult"
-  /api/v1/statistics:
+                $ref: "#/components/schemas/PaginatedSearch"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/statistics/:
     get:
       tags:
         - statistics
       summary: Get statistics for the authenticated user
       parameters:
         - in: query
-          name: type
-          schema:
-            $ref: "#/components/schemas/MediaType"
-        - in: query
-          name: status
-          schema:
-            $ref: "#/components/schemas/MediaStatus"
-        - in: query
-          name: period
+          name: end_date
           schema:
             type: string
-            enum:
-              - all
-              - year
-              - month
-              - week
-            default: year
+            format: date
+          description: Filter media ended before this date (YYYY-MM-DD)
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+          description: Filter media started after this date (YYYY-MM-DD)
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatisticsResponse"
 components:
   securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
     bearerAuth:
       type: http
       scheme: bearer
   schemas:
-    CalendarEvent:
-      type: object
-      properties:
-        id:
-          type: integer
-        datetime:
-          type: string
-          format: date-time
-        title:
-          type: string
-        item:
-          $ref: "#/components/schemas/Item"
-    CreateCustomMediaOfType:
-      type: object
-      properties:
-        title:
-          type: string
-        image:
-          type: string
-      required:
-        - title
-    CreateList:
-      type: object
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-      required:
-        - name
-    CustomList:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        description:
-          type: string
-    CustomListDetail:
-      allOf:
-        - $ref: "#/components/schemas/CustomList"
-        - type: object
-          properties:
-            items:
-              type: array
-              items:
-                $ref: "#/components/schemas/Item"
-    HistoryRecord:
-      type: object
-      properties:
-        id:
-          type: string
-        history_date:
-          type: string
-          format: date-time
-        changes:
-          type: object
-          additionalProperties: true
-    Item:
+    CompleteItem:
+      # TODO: Fix this schema adding all metadata fields
       type: object
       properties:
         id:
@@ -478,24 +598,33 @@ components:
         source:
           $ref: "#/components/schemas/Source"
         media_type:
-          $ref: "#/components/schemas/MediaType"
+          $ref: "#/components/schemas/CompleteMediaType"
         title:
           type: string
         image:
           type: string
+          format: uri
         season_number:
           type: integer
           nullable: true
+          description: If the item is a season or an episode, its season number is shown
         episode_number:
           type: integer
           nullable: true
-    Media:
+          description: If the item is an episode, its episode number is shown
+    CompleteMedia:
+      # TODO: Fix this schema adding all metadata fields
       type: object
       properties:
         id:
           type: integer
         item:
-          $ref: "#/components/schemas/Item"
+          $ref: "#/components/schemas/CompleteItem"
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        created_at:
+          type: string
+          format: date-time
         score:
           type: number
           format: float
@@ -512,15 +641,166 @@ components:
           type: string
           format: date-time
           nullable: true
+        notes:
+          type: string
+          nullable: true
+    CreateMediaOfType:
+      type: object
+      properties:
+        title:
+          type: string
+        image:
+          type: string
+      required:
+        - title
+    CreateMedia:
+      description: |
+        Unified payload for creating media items. Use `source: manual` for manual items (omit `media_id`) or
+        set a provider `source` and `media_id` to create from a provider.
+        When using a media provider, all media data will be overwritten.
+      type: object
+      properties:
+        source:
+          $ref: "#/components/schemas/Source"
+          description: "Provider source or 'manual'"
+        media_id:
+          type: string
+          nullable: true
+          description: "Provider media identifier (required for provider sources)"
+        title:
+          type: string
+        image:
+          type: string
+          nullable: true
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        repeats:
+          type: integer
+          nullable: true
+        season_number:
+          type: integer
+          nullable: true
+        episode_number:
+          type: integer
+          nullable: true
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        errors:
+          type: object
+          nullable: true
+          description: Object of errors regarding body fields
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+        media_id:
+          type: string
+        source:
+          $ref: "#/components/schemas/Source"
+        media_type:
+          $ref: "#/components/schemas/CompleteMediaType"
+        title:
+          type: string
+        image:
+          type: string
+          format: uri
+        season_number:
+          type: integer
+          nullable: true
+          description: If the item is a season or an episode, its season number is shown
+        episode_number:
+          type: integer
+          nullable: true
+          description: If the item is an episode, its episode number is shown
+    ItemId:
+      type: string
+      description: media_type/media_source/media_id
+    Media:
+      type: object
+      properties:
+        id:
+          type: integer
+        item:
+          $ref: "#/components/schemas/Item"
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        created_at:
+          type: string
+          format: date-time
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
     MediaStatus:
+      type: integer
+      enum:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+      x-enumNames:
+        - Planning
+        - In progress
+        - Paused
+        - Completed
+        - Dropped
+      description: |
+        Integer mapping for statuses:
+          0 = Planning
+          1 = In progress
+          2 = Paused
+          3 = Completed
+          4 = Dropped
+      nullable: true
+    MediaType:
       type: string
       enum:
-        - Completed
-        - In progress
-        - Planning
-        - Paused
-        - Dropped
-    MediaType:
+        - tv
+        - movie
+        - anime
+        - manga
+        - game
+        - book
+        - comic
+    CompleteMediaType:
       type: string
       enum:
         - tv
@@ -535,33 +815,97 @@ components:
     PaginatedMedia:
       type: object
       properties:
-        count:
-          type: integer
-        next:
-          type: string
-          nullable: true
-        previous:
-          type: string
-          nullable: true
+        pagination:
+          type: object
+          properties:
+            total:
+              type: integer
+            limit:
+              type: integer
+            offset:
+              type: integer
+            next:
+              type: string
+              nullable: true
+              description: The next page URL with updated offset
+            previous:
+              type: string
+              nullable: true
+              description: The previous page URL with updated offset
         results:
           type: array
           items:
             $ref: "#/components/schemas/Media"
-    SearchResult:
+    PaginatedSearch:
       type: object
       properties:
-        id:
-          type: string
-        title:
-          type: string
+        pagination:
+          type: object
+          properties:
+            total:
+              type: integer
+            limit:
+              type: integer
+            offset:
+              type: integer
+            next:
+              type: string
+              nullable: true
+              description: The next page URL with updated offset
+            previous:
+              type: string
+              nullable: true
+              description: The previous page URL with updated offset
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchItem"
+    SearchItem:
+      type: object
+      properties:
+        media_id:
+          type: integer
         source:
           $ref: "#/components/schemas/Source"
         media_type:
           $ref: "#/components/schemas/MediaType"
+        title:
+          type: string
         image:
           type: string
-        external_id:
-          type: string
+          format: uri
+    SortOptions:
+      type: string
+      enum:
+        - added_asc
+        - added_desc
+        - ended_asc
+        - ended_desc
+        - episode_asc
+        - episode_desc
+        - id_asc
+        - id_desc
+        - itemid_asc
+        - itemid_desc
+        - mediaid_asc
+        - mediaid_desc
+        - progress_asc
+        - progress_desc
+        - score_asc
+        - score_desc
+        - season_asc
+        - season_desc
+        - source_asc
+        - source_desc
+        - started_asc
+        - started_desc
+        - title_asc
+        - title_desc
+        - type_asc
+        - type_desc
+        - updated_asc
+        - updated_desc
+      description: season sorts are supported only for seasons and episodes, episode sorts are supported only for episodes
     Source:
       type: string
       enum:
@@ -573,25 +917,66 @@ components:
         - hardcover
         - comicvine
         - manual
-    UpdateList:
+    StatisticsResponse:
       type: object
       properties:
-        name:
-          type: string
-        description:
-          type: string
-    UpdateMedia:
-      type: object
-      properties:
-        score:
-          type: number
-        status:
-          $ref: "#/components/schemas/MediaStatus"
-        progress:
-          type: integer
         start_date:
           type: string
-          format: date-time
+          format: date
         end_date:
           type: string
-          format: date-time
+          format: date
+        media_count:
+          type: object
+          description: Number of tracked media
+          properties:
+            total:
+              type: integer
+              description: Total number of tracked media
+            tv:
+              type: integer
+              description: Number of tracked TV shows
+            season:
+              type: integer
+              description: Number of tracked Seasons
+            movie:
+              type: integer
+              description: Number of tracked Movies
+            anime:
+              type: integer
+              description: Number of tracked Animes
+            manga:
+              type: integer
+              description: Number of tracked Mangas
+            game:
+              type: integer
+              description: Number of tracked Games
+            book:
+              type: integer
+              description: Number of tracked Books
+            comic:
+              type: integer
+              description: Number of tracked Comics
+        activity_data:
+          type: object
+          description: Daily activity counts
+        media_type_distribution:
+          type: object
+          description: Formatted data for Chart.js pie chart
+        score_distribution:
+          type: object
+          description: Score distribution for each media type
+        top_rated:
+          type: array
+          items: 
+            $ref: "#/components/schemas/Media"
+          description: Array of top rated medias
+        status_distribution:
+          type: object
+          description: Status distribution for each media type
+        status_pie_chart_data:
+          type: object
+          description: Status distribution pie chart
+        timeline:
+          type: object
+          description: Timeline of media consumption by month
