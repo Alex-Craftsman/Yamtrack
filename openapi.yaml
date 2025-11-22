@@ -21,9 +21,70 @@ paths:
       tags:
         - calendar
       summary: List upcoming calendar events
+      parameters:
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+          description: The start date to retrieve events for (YYYY-MM-DD)
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+          description: The end date to retrieve events for. If it's not specified the default is today (YYYY-MM-DD)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: month
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: The month to retrieve events for (1-12). Used only if start_date is not set. Default is current month
+        - in: query
+          name: year
+          schema:
+            type: integer
+          description: The year to retrieve events for. Used only if start_date is not set. Default is current year
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedCalendar"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/calendar/update/:
+    post:
+      tags:
+        - calendar
+      summary: Update calendar events
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicResponse"
   /api/v1/lists/:
     get:
       tags:
@@ -587,6 +648,34 @@ components:
       type: http
       scheme: bearer
   schemas:
+    BasicResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: The detail message of the response
+    CalendarEvent:
+      type: object
+      description: The calendar event
+      properties:
+        id:
+          type: integer
+        item:
+          $ref: "#/components/schemas/Item"
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        title:
+          type: string
+        media_type:
+          type: string
+        image:
+          type: string
+          format: uri
+        content_number:
+          type: integer
+        datetime:
+          type: string
+          format: date-time
     CompleteItem:
       # TODO: Fix this schema adding all metadata fields
       type: object
@@ -812,26 +901,20 @@ components:
         - game
         - book
         - comic
+    PaginatedCalendar:
+      type: object
+      properties:
+        Pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarEvent"
     PaginatedMedia:
       type: object
       properties:
         pagination:
-          type: object
-          properties:
-            total:
-              type: integer
-            limit:
-              type: integer
-            offset:
-              type: integer
-            next:
-              type: string
-              nullable: true
-              description: The next page URL with updated offset
-            previous:
-              type: string
-              nullable: true
-              description: The previous page URL with updated offset
+          $ref: "#/components/schemas/Pagination"
         results:
           type: array
           items:
@@ -840,26 +923,30 @@ components:
       type: object
       properties:
         pagination:
-          type: object
-          properties:
-            total:
-              type: integer
-            limit:
-              type: integer
-            offset:
-              type: integer
-            next:
-              type: string
-              nullable: true
-              description: The next page URL with updated offset
-            previous:
-              type: string
-              nullable: true
-              description: The previous page URL with updated offset
+          $ref: "#/components/schemas/Pagination"
         results:
           type: array
           items:
             $ref: "#/components/schemas/SearchItem"
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: The next page URL with updated offset
+        previous:
+          type: string
+          format: uri
+          nullable: true
+          description: The previous page URL with updated offset
     SearchItem:
       type: object
       properties:

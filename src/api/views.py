@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from django.db import IntegrityError
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -18,6 +20,8 @@ from app.statistics import (
     get_timeline,
     get_user_media,
 )
+from events import tasks
+from events.models import Event
 from users.models import MediaStatusChoices
 
 from .helpers import (
@@ -131,7 +135,7 @@ class MediaListView(drf_views.APIView):
         if sort_order == "desc":
             results.reverse()
 
-        paginated_data = paginate_data(request, results, limit, offset)
+        paginated_data = paginate_data(request, results, limit, offset, "media")
         return Response(paginated_data)
 
 
@@ -192,7 +196,7 @@ class MediaTypeListView(drf_views.APIView):
         if sort_order == "desc":
             results.reverse()
 
-        paginated_data = paginate_data(request, results, limit, offset)
+        paginated_data = paginate_data(request, results, limit, offset, "media")
         return Response(paginated_data)
 
     def post(self, request, media_type):
@@ -541,5 +545,81 @@ class ListRemoveItemView(drf_views.APIView):
 
 # /api/v1/calendar
 class CalendarView(drf_views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request):
-        return Response({"detail": "Not implemented"}, status=501)
+        start_date = request.GET.get("start_date")
+        end_date = request.GET.get("end_date")
+        month_q = request.GET.get("month")
+        year_q = request.GET.get("year")
+
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        if start_date:
+            if end_date:
+                try:
+                    start_date_parsed = parse_date(start_date)
+                    end_date_parsed = parse_date(end_date)
+                    if not start_date_parsed or not end_date_parsed:
+                        raise ValueError("Invalid date format")
+                    first_day = start_date_parsed
+                    last_day = end_date_parsed
+                except (TypeError, ValueError):
+                    return Response(
+                        {"detail": "Bad Request. Invalid date format."},
+                        status=400,
+                    )
+            else:
+                try:
+                    start_date_parsed = parse_date(start_date)
+                    if not start_date_parsed:
+                        raise ValueError("Invalid date format")
+                    first_day = start_date_parsed
+                    last_day = timezone.localdate()
+                except (TypeError, ValueError):
+                    return Response(
+                        {"detail": "Bad Request. Invalid date format."},
+                        status=400,
+                    )
+        else:
+            try:
+                if month_q and year_q:
+                    current = date(int(year_q), int(month_q), 1)
+                else:
+                    current = timezone.localdate()
+            except (TypeError, ValueError):
+                current = timezone.localdate()
+
+            month = current.month
+            year = current.year
+
+            is_december = month == 12
+
+            first_day = date(year, month, 1)
+            if is_december:
+                last_day = date(year, 12, 31)
+            else:
+                last_day = date(year, month + 1, 1) - timedelta(days=1)
+
+        try:
+            releases = Event.objects.get_user_events(request.user, first_day, last_day)
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        paginated_data = paginate_data(request, releases, limit, offset, "events")
+
+        return Response(paginated_data)
+
+
+# /api/v1/calendar/update
+class UpdateCalendarView(drf_views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        tasks.reload_calendar.delay(request.user)
+        return Response({"detail": "Accepted. Task queued"}, status=202)

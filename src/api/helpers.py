@@ -18,7 +18,7 @@ from app.models import (
 )
 from users.models import MediaStatusChoices
 
-from .serializers import MediaSerializer
+from .serializers import EventSerializer, MediaSerializer
 
 MEDIA_TYPE_MODEL_MAP = {
     MediaTypes.TV.value: TV,
@@ -81,14 +81,17 @@ def make_page_url(request, limit, new_offset):
     return request.build_absolute_uri(request.path + "?" + urlencode(params))
 
 
-def paginate_data(request, results, limit, offset):
+def paginate_data(request, results, limit, offset, data_type):
     """Paginate the results based on the limit and offset."""
     total = len(results)
     start = offset
     end = offset + limit
     paginated = results[start:end]
 
-    serializer = MediaSerializer(paginated, many=True)
+    if data_type == "media":
+        serialized = MediaSerializer(paginated, many=True)
+    elif data_type == "events":
+        serialized = EventSerializer(paginated, many=True)
 
     next_url = None
     prev_url = None
@@ -106,7 +109,7 @@ def paginate_data(request, results, limit, offset):
         "previous": prev_url,
     }
 
-    return {"pagination": pagination, "results": serializer.data}
+    return {"pagination": pagination, "results": serialized.data}
 
 
 def parse_limit_offset(request):

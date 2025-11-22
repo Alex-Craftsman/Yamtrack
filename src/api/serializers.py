@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from app.models import BasicMedia, Item
+from events.models import Event
 
 
 class ItemSerializer(serializers.ModelSerializer):
@@ -20,6 +21,24 @@ class MediaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BasicMedia
+        fields = "__all__"
+
+    def get_item_id(self, obj):
+        item = getattr(obj, "item", None)
+        if not item:
+            return None
+        return f"{item.media_type}/{item.source}/{item.media_id}"
+
+
+class EventSerializer(serializers.ModelSerializer):
+    """Serializer used for calendar events."""
+
+    item = ItemSerializer()
+
+    item_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
         fields = "__all__"
 
     def get_item_id(self, obj):
