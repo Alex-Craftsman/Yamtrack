@@ -154,6 +154,8 @@ MIDDLEWARE = [
     "simple_history.middleware.HistoryRequestMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "app.middleware.ProviderAPIErrorMiddleware",
+    # Convert HTML 404s for API requests into JSON responses
+    "api.middleware.ApiJsonErrorMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
