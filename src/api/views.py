@@ -9,7 +9,7 @@ from rest_framework import views as drf_views
 from rest_framework.response import Response
 
 from app.forms import ManualItemForm, get_form_class
-from app.models import Item, MediaTypes, Sources
+from app.models import BasicMedia, Item, MediaTypes, Sources
 from app.providers import services
 from app.statistics import (
     get_activity_data,
@@ -28,11 +28,13 @@ from .helpers import (
     EPISODES_ADDITIONAL_SORTS,
     EXISTING_SORTS,
     MANUAL_SORTS,
-    MEDIA_TYPE_MODEL_MAP,
+    MEDIA_TYPE_COMPLETE_MODEL_MAP,
     MEDIA_TYPE_VALID_LIST,
     SEASONS_ADDITIONAL_SORTS,
     apply_aggregated_sort,
     apply_manual_sort_for_type,
+    check_source_type,
+    check_valid_type,
     fetch_media_list,
     get_media_status,
     make_page_url,
@@ -40,7 +42,14 @@ from .helpers import (
     parse_limit_offset,
     parse_sort_filter,
 )
+from .history_processor import delete_entry, process_history_entries
 from .serializers import MediaSerializer, TimelineItemSerializer
+
+# TODO!!!: Implement seasons and episodes
+# - tv type has children seasons
+# - season type has parent tv and children episodes (tv/source/id/season)
+# - episode type has parent season (tv/source/id/season/episode)
+# serializers need to be updated to include nested relationships, and also the logic for seasons and episodes in the views
 
 
 # /api/v1/media/
@@ -77,45 +86,47 @@ class MediaListView(drf_views.APIView):
 
         results = []
         sort, sort_order = parse_sort_filter(sort_filter)
-        sorted = False
+        already_sorted = False
 
         if media_type:
-            if media_type in MEDIA_TYPE_VALID_LIST:
-                sort_list = EXISTING_SORTS
-                if media_type == "season":
-                    sort_list += SEASONS_ADDITIONAL_SORTS
-                elif media_type == "episode":
-                    sort_list += EPISODES_ADDITIONAL_SORTS
-
-                if sort in sort_list:
-                    media_sort = sort
-                    sorted = True
-                else:
-                    media_sort = ""
-
-                results.extend(
-                    fetch_media_list(user, media_type, status, media_sort, search),
+            if not check_valid_type(media_type, complete=True):
+                return Response(
+                    {"detail": "Bad Request. Unsupported media type."},
+                    status=400,
                 )
 
-                if not sorted and sort != "":
-                    if sort in MANUAL_SORTS:
-                        results = apply_manual_sort_for_type(results, sort)
-                        if isinstance(results, Response):
-                            return results
-                    else:
-                        return Response(
-                            {"detail": "Not Found. Invalid sorting"},
-                            status=404,
-                        )
+            sort_list = EXISTING_SORTS
+            if media_type == "season":
+                sort_list += SEASONS_ADDITIONAL_SORTS
+            elif media_type == "episode":
+                sort_list += EPISODES_ADDITIONAL_SORTS
+
+            if sort in sort_list:
+                media_sort = sort
+                already_sorted = True
             else:
-                return Response({"detail": "Not Found. Invalid media type"}, status=404)
+                media_sort = ""
+
+            results.extend(
+                fetch_media_list(user, media_type, status, media_sort, search),
+            )
+
+            if not already_sorted and sort != "":
+                if sort in MANUAL_SORTS:
+                    results = apply_manual_sort_for_type(results, sort)
+                    if isinstance(results, Response):
+                        return results
+                else:
+                    return Response(
+                        {"detail": "Not Found. Invalid sorting"},
+                        status=404,
+                    )
+
         else:
+            # Exclude EPISODES and SEASONS from results by default
+            # to declutter the results
             excluded_set = {e.strip().lower() for e in exclude if e and e.strip()}
-            allowed_types = [
-                t
-                for t in MEDIA_TYPE_VALID_LIST
-                if t is not MediaTypes.EPISODE.value and t not in excluded_set
-            ]
+            allowed_types = [t for t in MEDIA_TYPE_VALID_LIST if t not in excluded_set]
 
             for t in allowed_types:
                 results.extend(fetch_media_list(user, t, status, "", search))
@@ -141,6 +152,8 @@ class MediaListView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/
 class MediaTypeListView(drf_views.APIView):
+    """Retrieve the list of media for the authenticated user for a specific media type."""
+
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -163,10 +176,13 @@ class MediaTypeListView(drf_views.APIView):
 
         results = []
         sort, sort_order = parse_sort_filter(sort_filter)
-        sorted = False
+        already_sorted = False
 
-        if media_type not in MEDIA_TYPE_VALID_LIST:
-            return Response({"detail": "Bad Request. Invalid type."}, status=400)
+        if not check_valid_type(media_type, complete=True):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
 
         sort_list = EXISTING_SORTS
         if media_type == "season":
@@ -176,13 +192,13 @@ class MediaTypeListView(drf_views.APIView):
 
         if sort in sort_list:
             media_sort = sort
-            sorted = True
+            already_sorted = True
         else:
             media_sort = ""
 
         results = fetch_media_list(user, media_type, status, media_sort, search)
 
-        if not sorted and sort != "":
+        if not already_sorted and sort != "":
             if sort in MANUAL_SORTS:
                 results = apply_manual_sort_for_type(results, sort)
                 if isinstance(results, Response):
@@ -200,8 +216,13 @@ class MediaTypeListView(drf_views.APIView):
         return Response(paginated_data)
 
     def post(self, request, media_type):
-        if media_type not in MEDIA_TYPE_VALID_LIST:
-            return Response({"detail": "Bad Request. Invalid type."}, status=400)
+        return Response({"detail": "Not Implemented"}, status=501)
+
+        if not check_valid_type(media_type, complete=True):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
 
         if not request.data:
             return Response({"detail": "Bad Request. Missing body."}, status=400)
@@ -299,7 +320,7 @@ class MediaTypeListView(drf_views.APIView):
                 status=500,
             )
 
-        model = MEDIA_TYPE_MODEL_MAP.get(media_type)
+        model = MEDIA_TYPE_COMPLETE_MODEL_MAP.get(media_type)
         if model is None:
             return Response(
                 {"detail": "Bad Request. Unsupported media type."},
@@ -322,48 +343,269 @@ class MediaTypeListView(drf_views.APIView):
         return Response(serializer.data, status=201)
 
 
-# /api/v1/media/[media_type]/[source]/[id]
+# /api/v1/media/[media_type]/[source]/[media_id]/
 class MediaDetailView(drf_views.APIView):
+    """Operations on a specific media for the authenticated user."""
+
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, media_type, source, id):
+    def get(self, request, media_type, source, media_id):
+        """Retrieve details of a specific media for the authenticated user."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            media_metadata = services.get_media_metadata(media_type, media_id, source)
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        tracked = False
+        created = ""
+        score = ""
+        progress = ""
+        progressed_at = ""
+        status = ""
+        start_date = ""
+        end_date = ""
+        notes = ""
+
+        try:
+            user_medias = BasicMedia.objects.filter_media_prefetch(
+                user,
+                media_id,
+                media_type,
+                source,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        if (
+            "related" in media_metadata
+            and media_metadata["related"] is not None
+            and "recommendations" in media_metadata["related"]
+        ):
+            media_metadata["related"].pop("recommendations")
+
+        if user_medias:
+            serialized = MediaSerializer(user_medias[0]).data
+            tracked = True
+            created = serialized["created_at"]
+            score = serialized["score"]
+            progress = serialized["progress"]
+            progressed_at = serialized["progressed_at"]
+            status = serialized["status"]
+            start_date = serialized["start_date"]
+            end_date = serialized["end_date"]
+            notes = serialized["notes"]
+
+        media_metadata["item_id"] = f"{media_type}/{source}/{media_id}"
+        media_metadata["tracked"] = tracked
+        media_metadata["user_created"] = created
+        media_metadata["user_score"] = score
+        media_metadata["user_progress"] = progress
+        media_metadata["user_progressed_at"] = progressed_at
+        media_metadata["user_status"] = status
+        media_metadata["user_start_date"] = start_date
+        media_metadata["user_end_date"] = end_date
+        media_metadata["user_notes"] = notes
+
+        if media_type == MediaTypes.TV.value:
+            details = media_metadata.get("details", {})
+            if "tvdb_id" in media_metadata:
+                details["tvdb_id"] = media_metadata.pop("tvdb_id")
+            if "last_episode_season" in media_metadata:
+                details["last_episode_season"] = media_metadata.pop(
+                    "last_episode_season",
+                )
+            if "next_episode_season" in media_metadata:
+                details["next_episode_season"] = media_metadata.pop(
+                    "next_episode_season",
+                )
+            media_metadata["details"] = details
+        elif media_type == MediaTypes.COMIC.value:
+            details = media_metadata.get("details", {})
+            if "last_issue_id" in media_metadata:
+                details["last_issue_id"] = media_metadata.pop("last_issue_id")
+            media_metadata["details"] = details
+
+        return Response(media_metadata)
+
+    def patch(self, request, media_type, source, media_id):
         return Response({"detail": "Not Implemented"}, status=501)
 
-    def patch(self, request, media_type, source, id):
-        return Response({"detail": "Not Implemented"}, status=501)
-
-    def delete(self, request, media_type, source, id):
+    def delete(self, request, media_type, source, media_id):
         return Response({"detail": "Not Implemented"}, status=501)
 
 
-# /api/v1/media/[media_type]/[source]/[id]/history
-class MediaHistoryView(drf_views.APIView):
+# /api/v1/media/[media_type]/[source]/[media_id]/recommendations/
+class MediaRecommendationsView(drf_views.APIView):
+    """Retrieve recommendations for a specific media."""
+
+    serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, media_type, source, id):
-        return Response({"detail": "Not implemented"}, status=501)
+    def get(self, request, media_type, source, media_id):
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            media_metadata = services.get_media_metadata(media_type, media_id, source)
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        recommendations = []
+        if (
+            "related" in media_metadata
+            and media_metadata["related"] is not None
+            and "recommendations" in media_metadata["related"]
+        ):
+            recommendations = media_metadata["related"]["recommendations"]
+
+        return Response(recommendations)
 
 
-# /api/v1/media/[media_type]/[source]/[id]/sync
+# /api/v1/media/[media_type]/[source]/[media_id]/history/
+class MediaHistoryView(drf_views.APIView):
+    """Retrieve the history timeline for a specific media."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, media_id):
+        """Retrieve history timeline entries for a specific media."""
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        user_medias = BasicMedia.objects.filter_media(
+            request.user,
+            media_id,
+            media_type,
+            source,
+        )
+
+        timeline_entries = []
+        if user_medias.exists():
+            timeline_entries = [
+                entry
+                for media in user_medias
+                if (history := media.history.all())
+                for entry in process_history_entries(history, media_type)
+            ]
+
+        paginated_data = paginate_data(
+            request,
+            timeline_entries,
+            limit,
+            offset,
+            "history",
+        )
+        return Response(paginated_data)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/history/[history_id]
+class MediaHistoryDetailView(drf_views.APIView):
+    """Delete the history record for a specific media."""
+
+    # TODO?: Should this be available at `/api/v1/history/[history_id]` since the history_id is not based on specific media?
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, media_type, source, media_id, history_id):
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            delete_entry(media_type, history_id, request.user)
+            return Response({"detail": "Record removed correctly"}, status=204)
+        except Exception as e:
+            return Response(
+                {"detail": "Record not found", "errors": str(e)}, status=404
+            )
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/sync/
 class MediaSyncView(drf_views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, media_type, source, id):
+    def post(self, request, media_type, source, media_id):
         return Response({"detail": "Not implemented"}, status=501)
 
 
-# /api/v1/media/[media_type]/[source]/[id]/lists
+# /api/v1/media/[media_type]/[source]/[media_id]/lists/
 class MediaAddToListView(drf_views.APIView):
-    def post(self, request, media_type, source, id):
+    def post(self, request, media_type, source, media_id):
         return Response({"detail": "Not implemented"}, status=501)
 
-    def delete(self, request, media_type, source, id):
+    def delete(self, request, media_type, source, media_id):
         return Response({"detail": "Not implemented"}, status=501)
 
 
-# /api/v1/search/[media_type]
+# /api/v1/search/[media_type]/
 class SearchProviderView(drf_views.APIView):
+    """Search for media using the specified provider."""
+
+    serializer_class = MediaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request, media_type):
         search = request.GET.get("search", "")
         source = request.GET.get("source", None)
@@ -371,14 +613,22 @@ class SearchProviderView(drf_views.APIView):
         if err:
             return err
 
-        if media_type not in MEDIA_TYPE_VALID_LIST:
-            return Response({"detail": "Bad Request. Invalid type."}, status=400)
+        if not check_valid_type(media_type, complete=True):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
         if media_type in ("season", "episode"):
+            # Since data of seasons and episodes (title, author, description,
+            # etc.) is not saved in the db but retrieved every time, it's not
+            # possible to search for them
             return Response(
                 {"detail": f"Bad Request. Search for {media_type} is not supported."},
             )
 
         if source == Sources.MANUAL.value:
+            # Since manual source data is user-defined and not indexed,
+            # searching is not supported
             return Response(
                 {"detail": "Bad Request. Search for manual source is not supported."},
                 status=400,
@@ -443,11 +693,14 @@ class SearchProviderView(drf_views.APIView):
         return Response(payload)
 
 
-# /api/v1/statistics
+# /api/v1/statistics/
 class StatisticsView(drf_views.APIView):
-    # TODO: Possibly don't use WebUI needed statistics but compute them for API
+    """Retrieve statistics for the authenticated user."""
+
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        # TODO: Possibly don't use WebUI needed statistics but compute them for API
         timeformat = "%Y-%m-%d"
         today = timezone.localdate()
         one_year_ago = today.replace(year=today.year - 1).strftime(timeformat)
@@ -510,7 +763,7 @@ class StatisticsView(drf_views.APIView):
         return Response(statistics, status=200)
 
 
-# /api/v1/lists
+# /api/v1/lists/
 class ListsView(drf_views.APIView):
     def get(self, request):
         return Response({"detail": "Not implemented"}, status=501)
@@ -519,7 +772,7 @@ class ListsView(drf_views.APIView):
         return Response({"detail": "Not implemented"}, status=501)
 
 
-# /api/v1/lists/[id]
+# /api/v1/lists/[id]/
 class ListDetailView(drf_views.APIView):
     def get(self, request, id):
         return Response({"detail": "Not implemented"}, status=501)
@@ -531,20 +784,22 @@ class ListDetailView(drf_views.APIView):
         return Response({"detail": "Not implemented"}, status=501)
 
 
-# /api/v1/lists/[id]/items
+# /api/v1/lists/[id]/items/
 class ListAddItemView(drf_views.APIView):
     def post(self, request, id):
         return Response({"detail": "Not implemented"}, status=501)
 
 
-# /api/v1/lists/[id]/items/[item_id]
+# /api/v1/lists/[id]/items/[item_id]/
 class ListRemoveItemView(drf_views.APIView):
     def delete(self, request, id, item_id):
         return Response({"detail": "Not implemented"}, status=501)
 
 
-# /api/v1/calendar
+# /api/v1/calendar/
 class CalendarView(drf_views.APIView):
+    """Retrieve calendar events for the authenticated user."""
+
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -616,8 +871,10 @@ class CalendarView(drf_views.APIView):
         return Response(paginated_data)
 
 
-# /api/v1/calendar/update
+# /api/v1/calendar/update/
 class UpdateCalendarView(drf_views.APIView):
+    """Trigger calendar events update for the authenticated user."""
+
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):

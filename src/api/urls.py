@@ -11,15 +11,17 @@ urlpatterns = [
     ),
     re_path(r"^lists/?$", views.ListsView.as_view(), name="api_lists"),
     re_path(
-        r"^lists/(?P<id>\d+)/?$", views.ListDetailView.as_view(), name="api_list_detail"
+        r"^lists/(?P<list_id>\d+)/?$",
+        views.ListDetailView.as_view(),
+        name="api_list_detail",
     ),
     re_path(
-        r"^lists/(?P<id>\d+)/items/?$",
+        r"^lists/(?P<list_id>\d+)/items/?$",
         views.ListAddItemView.as_view(),
         name="api_list_add_item",
     ),
     re_path(
-        r"^lists/(?P<id>\d+)/items/(?P<item_id>\d+)/?$",
+        r"^lists/(?P<list_id>\d+)/items/(?P<item_id>\d+)/?$",
         views.ListRemoveItemView.as_view(),
         name="api_list_remove_item",
     ),
@@ -40,14 +42,24 @@ urlpatterns = [
         name="api_media_history",
     ),
     re_path(
-        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/sync/?$",
-        views.MediaSyncView.as_view(),
-        name="api_media_sync",
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/history/(?P<history_id>[^/]+)/?$",
+        views.MediaHistoryDetailView.as_view(),
+        name="api_media_history_detail",
     ),
     re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/lists/?$",
         views.MediaAddToListView.as_view(),
         name="api_media_add_to_list",
+    ),
+    re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/recommendations/?$",
+        views.MediaRecommendationsView.as_view(),
+        name="api_media_recommendations",
+    ),
+    re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/sync/?$",
+        views.MediaSyncView.as_view(),
+        name="api_media_sync",
     ),
     re_path(
         r"^search/(?P<media_type>[^/]+)/?$",

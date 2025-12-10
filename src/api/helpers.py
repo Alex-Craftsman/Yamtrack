@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import urlencode
 
 from rest_framework.response import Response
@@ -18,12 +19,27 @@ from app.models import (
 )
 from users.models import MediaStatusChoices
 
-from .serializers import EventSerializer, MediaSerializer
+from .serializers import EpisodeSerializer, EventSerializer, MediaSerializer
 
-MEDIA_TYPE_MODEL_MAP = {
+logger = logging.getLogger(__name__)
+
+
+MEDIA_TYPE_COMPLETE_MODEL_MAP = {
     MediaTypes.TV.value: TV,
     MediaTypes.SEASON.value: Season,
     MediaTypes.EPISODE.value: Episode,
+    MediaTypes.MOVIE.value: Movie,
+    MediaTypes.ANIME.value: Anime,
+    MediaTypes.MANGA.value: Manga,
+    MediaTypes.GAME.value: Game,
+    MediaTypes.BOOK.value: Book,
+    MediaTypes.COMIC.value: Comic,
+}
+
+MEDIA_TYPE_COMPLETE_VALID_LIST = list(MEDIA_TYPE_COMPLETE_MODEL_MAP.keys())
+
+MEDIA_TYPE_MODEL_MAP = {
+    MediaTypes.TV.value: TV,
     MediaTypes.MOVIE.value: Movie,
     MediaTypes.ANIME.value: Anime,
     MediaTypes.MANGA.value: Manga,
@@ -54,6 +70,32 @@ MANUAL_SORTS = [
     "updated",
     "itemid",
 ]
+
+VALID_SOURCES = {
+    MediaTypes.TV.value: ["tmdb", "manual"],
+    MediaTypes.SEASON.value: ["tmdb", "manual"],
+    MediaTypes.EPISODE.value: ["tmdb", "manual"],
+    MediaTypes.MOVIE.value: ["tmdb", "manual"],
+    MediaTypes.ANIME.value: ["mal", "manual"],
+    MediaTypes.MANGA.value: ["mal", "mangaupdates", "manual"],
+    MediaTypes.GAME.value: ["igdb", "manual"],
+    MediaTypes.BOOK.value: ["openlibrary", "hardcover", "manual"],
+    MediaTypes.COMIC.value: ["comicvine", "manual"],
+}
+
+
+def check_valid_type(media_type, complete=False):
+    """Check the media type is valid."""
+    if complete:
+        return media_type in MEDIA_TYPE_COMPLETE_VALID_LIST
+    return media_type in MEDIA_TYPE_VALID_LIST
+
+
+def check_source_type(media_type, source):
+    """Check the source is valid for the given media type."""
+    if media_type in VALID_SOURCES:
+        return source in VALID_SOURCES[media_type]
+    return False
 
 
 def get_media_status(status):
@@ -87,9 +129,19 @@ def paginate_data(request, results, limit, offset, data_type):
     start = offset
     end = offset + limit
     paginated = results[start:end]
+    serialized_data = paginated
 
     if data_type == "media":
-        serialized = MediaSerializer(paginated, many=True)
+        serialized_data = []
+        for item in paginated:
+            if isinstance(item, Episode):
+                serialized_data.append(
+                    EpisodeSerializer(item, context={"request": request}).data,
+                )
+            else:
+                serialized_data.append(
+                    MediaSerializer(item, context={"request": request}).data,
+                )
     elif data_type == "events":
         serialized = EventSerializer(paginated, many=True)
 
@@ -108,8 +160,10 @@ def paginate_data(request, results, limit, offset, data_type):
         "next": next_url,
         "previous": prev_url,
     }
-
-    return {"pagination": pagination, "results": serialized.data}
+    results_payload = (
+        serialized_data if data_type in ("media", "history") else serialized.data
+    )
+    return {"pagination": pagination, "results": results_payload}
 
 
 def parse_limit_offset(request):
@@ -182,7 +236,21 @@ def itemid_key(media):
 
 
 def fetch_media_list(user, media_type, status, sort_filter, search):
-    """Wrapper around BasicMedia.objects.get_media_list that returns a plain list."""
+    """Returns a plain list of the requested media."""
+    if media_type == MediaTypes.EPISODE.value:
+        qs = Episode.objects.filter(related_season__user=user)
+        if status and status != MediaStatusChoices.ALL:
+            try:
+                qs = qs.filter(related_season__status=status)
+            except Exception:
+                logger.debug(
+                    "Error filtering episodes by related season status",
+                    exc_info=True,
+                )
+        if search:
+            qs = qs.filter(item__title__icontains=search)
+        return qs
+
     return list(
         BasicMedia.objects.get_media_list(
             user=user,

@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.2
+  version: 0.0.3
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -106,7 +106,7 @@ paths:
       responses:
         "201":
           description: Created
-  /api/v1/lists/{id}/:
+  /api/v1/lists/{list_id}/:
     get:
       tags:
         - lists
@@ -152,7 +152,26 @@ paths:
       responses:
         "204":
           description: Deleted
-  /api/v1/lists/{id}/items/:
+  /api/v1/lists/{list_id}/items/:
+    get:
+      tags:
+        - lists
+      summary: List list items
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "204":
+          description: OK
     post:
       tags:
         - lists
@@ -172,7 +191,25 @@ paths:
       responses:
         "204":
           description: Added
-  /api/v1/lists/{id}/items/{item_id}/:
+  /api/v1/lists/{list_id}/items/{item_id}/:
+    get:
+      tags:
+        - lists
+      summary: Get an Item from a list
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: item_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "300":
+          description: Redirect to /api/v1/media/{media_type}/{source}/{media_id}/
     delete:
       tags:
         - lists
@@ -201,7 +238,7 @@ paths:
           name: exclude
           schema:
             type: string
-          description: Comma-separated list of media types to exclude
+          description: Comma-separated list of media types to exclude (excluded by default are seasons and episodes)
         - in: query
           name: limit
           schema:
@@ -234,7 +271,7 @@ paths:
         - in: query
           name: media_type
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypesComplete"
           description: Filter by media type
       responses:
         "200":
@@ -259,7 +296,7 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypesComplete"
           description: Filter by media type
         - in: query
           name: limit
@@ -318,7 +355,7 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypesComplete"
       requestBody:
         required: true
         content:
@@ -365,7 +402,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/media/{media_type}/{source}/{id}/:
+  /api/v1/media/{media_type}/{source}/{media_id}/:
     get:
       tags:
         - media
@@ -375,24 +412,42 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypes"
         - in: path
           name: source
           required: true
           schema:
             $ref: "#/components/schemas/Source"
         - in: path
-          name: id
+          name: media_id
           required: true
           schema:
             type: integer
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteMedia"
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     patch:
       tags:
         - media
@@ -402,14 +457,14 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypes"
         - in: path
           name: source
           required: true
           schema:
             $ref: "#/components/schemas/Source"
         - in: path
-          name: id
+          name: media_id
           required: true
           schema:
             type: integer
@@ -435,14 +490,14 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypes"
         - in: path
           name: source
           required: true
           schema:
             $ref: "#/components/schemas/Source"
         - in: path
-          name: id
+          name: media_id
           required: true
           schema:
             type: integer
@@ -453,7 +508,7 @@ paths:
           description: Bad Request
         "404":
           description: Not Found
-  /api/v1/media/{media_type}/{source}/{id}/history/:
+  /api/v1/media/{media_type}/{source}/{media_id}/history/:
     get:
       tags:
         - media
@@ -463,25 +518,101 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypes"
         - in: path
           name: source
           required: true
           schema:
             $ref: "#/components/schemas/Source"
         - in: path
-          name: id
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/history/{history_id}/:
+    delete:
+      tags:
+        - media
+      summary: Delete a specific history record for a media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: history_id
           required: true
           schema:
             type: integer
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicResponse"
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not Found
-  /api/v1/media/{media_type}/{source}/{id}/lists/:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/lists/:
     post:
       tags:
         - lists
@@ -491,14 +622,14 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypes"
         - in: path
           name: source
           required: true
           schema:
             $ref: "#/components/schemas/Source"
         - in: path
-          name: id
+          name: media_id
           required: true
           schema:
             type: integer
@@ -520,14 +651,14 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypes"
         - in: path
           name: source
           required: true
           schema:
             $ref: "#/components/schemas/Source"
         - in: path
-          name: id
+          name: media_id
           required: true
           schema:
             type: integer
@@ -539,7 +670,99 @@ paths:
       responses:
         "204":
           description: Removed
-  /api/v1/media/{media_type}/{source}/{id}/sync/:
+  /api/v1/media/{media_type}/{source}/{media_id}/recommendations/:
+    get:
+      tags:
+        - media
+      summary: Retrieve related medias of a tracked media item by media type, source and media id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RelatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/seasons/:
+    get:
+      tags:
+        - media
+      summary: Retrieve tracked seasons for a TV media item by media type, source and media id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/sync/:
     post:
       tags:
         - media
@@ -549,20 +772,178 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/CompleteMediaType"
+            $ref: "#/components/schemas/MediaTypes"
         - in: path
           name: source
           required: true
           schema:
             $ref: "#/components/schemas/Source"
         - in: path
-          name: id
+          name: media_id
           required: true
           schema:
             type: integer
       responses:
         "202":
           description: Sync triggered
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/:
+    get:
+      tags:
+        - media
+      summary: Retrieve a tracked season item by media type, source, media id and season number
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/episodes/:
+    get:
+      tags:
+        - media
+      summary: Retrieve tracked episodes for a season item by media type, source, media id and season number
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/:
+    get:
+      tags:
+        - media
+      summary: Retrieve a tracked episode item by media type, source, media id, season number and episode number
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/search/{media_type}/:
     get:
       tags:
@@ -572,7 +953,7 @@ paths:
         - in: path
           name: media_type
           schema:
-            $ref: "#/components/schemas/MediaType"
+            $ref: "#/components/schemas/MediaTypes"
           description: Media type to search for
           required: true
         - in: query
@@ -648,12 +1029,40 @@ components:
       type: http
       scheme: bearer
   schemas:
+    AnimeDetails:
+      # TODO: missing fields
+      type: object
+      nullable: true
+    AnimeRelated:
+      # TODO: missing fields
+      type: object
+      nullable: true
     BasicResponse:
       type: object
       properties:
         detail:
           type: string
           description: The detail message of the response
+    BookDetails:
+      type: object
+      properties:
+        format:
+          type: string
+        number_of_pages:
+          type: integer
+        publish_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        author:
+          type: string
+        publisher:
+          type: string
+        isbn:
+          type: string
+    BookRelated:
+      type: object
+      nullable: true
     CalendarEvent:
       type: object
       description: The calendar event
@@ -676,72 +1085,133 @@ components:
         datetime:
           type: string
           format: date-time
-    CompleteItem:
-      # TODO: Fix this schema adding all metadata fields
+    ComicDetails:
       type: object
       properties:
-        id:
-          type: integer
-        media_id:
+        start_date:
           type: string
+          format: year
+        publisher:
+          type: string
+        issues_count:
+          type: integer
+        last_issue_name:
+          type: string
+        last_issue_number:
+          type: integer
+        people:
+          type: array
+          items:
+            type: string
+        last_updated:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        last_issue_id:
+          type: integer
+    ComicRelated:
+      type: object
+      nullable: true
+      properties:
+        from_the_same_publisher:
+          type: array
+          items:
+            type: object
+            properties:
+              media_id:
+                type: string
+              source:
+                type: string
+              media_type:
+                type: string
+              title:
+                type: string
+              image:
+                type: string
+                format: uri
+    CompleteMedia:
+      type: object
+      properties:
+        media_id:
+          type: integer
         source:
-          $ref: "#/components/schemas/Source"
-        media_type:
-          $ref: "#/components/schemas/CompleteMediaType"
+          type: string
+        source_url:
+          type: string
+          format: uri
         title:
           type: string
+        max_progress:
+          type: integer
         image:
           type: string
           format: uri
-        season_number:
-          type: integer
-          nullable: true
-          description: If the item is a season or an episode, its season number is shown
-        episode_number:
-          type: integer
-          nullable: true
-          description: If the item is an episode, its episode number is shown
-    CompleteMedia:
-      # TODO: Fix this schema adding all metadata fields
-      type: object
-      properties:
-        id:
-          type: integer
-        item:
-          $ref: "#/components/schemas/CompleteItem"
-        item_id:
-          $ref: "#/components/schemas/ItemId"
-        created_at:
+        synopsis:
           type: string
-          format: date-time
+        genres:
+          type: array
+          items:
+            type: string
         score:
           type: number
           format: float
-          nullable: true
-        status:
-          $ref: "#/components/schemas/MediaStatus"
-        progress:
+        score_count:
           type: integer
-        start_date:
+        details:
+        # TODO: missing tv serie & tv episode
+          oneOf:
+            - $ref: "#/components/schemas/MovieDetails"
+            - $ref: "#/components/schemas/TVDetails"
+            - $ref: "#/components/schemas/AnimeDetails"
+            - $ref: "#/components/schemas/MangaDetails"
+            - $ref: "#/components/schemas/GameDetails"
+            - $ref: "#/components/schemas/BookDetails"
+            - $ref: "#/components/schemas/ComicDetails"
+        related:
+        # TODO: missing tv serie & tv episode
+          oneOf:
+            - $ref: "#/components/schemas/MovieRelated"
+            - $ref: "#/components/schemas/TVRelated"
+            - $ref: "#/components/schemas/AnimeRelated"
+            - $ref: "#/components/schemas/MangaRelated"
+            - $ref: "#/components/schemas/GameRelated"
+            - $ref: "#/components/schemas/BookRelated"
+            - $ref: "#/components/schemas/ComicRelated"
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
+          description: If the Item is a Season or an Episode, the parent_id is the id of the Serie or of the Season
+        tracked:
+          type: boolean
+          description: If the current media is being tracked by Yamtrack
+        user_created:
           type: string
           format: date-time
           nullable: true
-        end_date:
+        user_score:
+          type: number
+          format: float
+          nullable: true
+        user_progress:
+          type: integer
+          nullable: true
+        user_progressed_at:
+          type: integer
+          nullable: true
+        user_status:
+          $ref: "#/components/schemas/MediaStatus"
+        user_start_date:
           type: string
           format: date-time
           nullable: true
-        notes:
+        user_end_date:
+          type: string
+          format: date-time
+          nullable: true
+        user_notes:
           type: string
           nullable: true
-    CreateMediaOfType:
-      type: object
-      properties:
-        title:
-          type: string
-        image:
-          type: string
-      required:
-        - title
     CreateMedia:
       description: |
         Unified payload for creating media items. Use `source: manual` for manual items (omit `media_id`) or
@@ -790,6 +1260,15 @@ components:
         episode_number:
           type: integer
           nullable: true
+    CreateMediaOfType:
+      type: object
+      properties:
+        title:
+          type: string
+        image:
+          type: string
+      required:
+        - title
     ErrorResponse:
       type: object
       properties:
@@ -799,6 +1278,92 @@ components:
           type: object
           nullable: true
           description: Object of errors regarding body fields
+    GameDetails:
+      type: object
+      properties:
+        format:
+          type: string
+          description: If it's a game, an expansion...
+          enum:
+            - "Main game"
+            - "DLC"
+            - "Expansion"
+            - "Bundle"
+            - "Standalone expansion"
+            - "Mod"
+            - "Episode"
+            - "Season"
+            - "Remake"
+            - "Remaster"
+            - "Expanded game"
+            - "Port"
+            - "Fork"
+            - "Pack"
+            - "Update"
+        release_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        themes:
+          type: string
+          nullable: true
+        platforms:
+          type: array
+          items:
+            type: string
+    GameRelated:
+      type: object
+      properties:
+        parent_game:
+          type: array
+          items:
+            type: string
+        remasters:
+          type: array
+          items:
+            type: string
+        remakes:
+          type: array
+          items:
+            type: string
+        expansions:
+          type: array
+          items:
+            type: string
+        standalone_expansions:
+          type: array
+          items:
+            type: string
+        expanded_games:
+          type: array
+          items:
+            type: string
+    History:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The history change id
+        timestamp:
+          type: string
+          format: date-time
+        changes:
+          type: array
+          description: List of changes done at specified timestamp
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: The media field changed
+              old_value:
+                type: string
+                description: The value before the change
+                nullable: true
+              new_value:
+                type: string
+                description: The value after the change
+                nullable: true
     Item:
       type: object
       properties:
@@ -809,7 +1374,7 @@ components:
         source:
           $ref: "#/components/schemas/Source"
         media_type:
-          $ref: "#/components/schemas/CompleteMediaType"
+          $ref: "#/components/schemas/MediaTypesComplete"
         title:
           type: string
         image:
@@ -825,7 +1390,15 @@ components:
           description: If the item is an episode, its episode number is shown
     ItemId:
       type: string
-      description: media_type/media_source/media_id
+      description: media_type/media_source/media_id(/season/episode)
+    MangaDetails:
+      # TODO: missing fields
+      type: object
+      nullable: true
+    MangaRelated:
+      # TODO: missing fields
+      type: object
+      nullable: true
     Media:
       type: object
       properties:
@@ -835,6 +1408,9 @@ components:
           $ref: "#/components/schemas/Item"
         item_id:
           $ref: "#/components/schemas/ItemId"
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
+          description: If the Item is a Season or an Episode, the parent_id is the id of the Serie or of the Season
         created_at:
           type: string
           format: date-time
@@ -879,7 +1455,7 @@ components:
           3 = Completed
           4 = Dropped
       nullable: true
-    MediaType:
+    MediaTypes:
       type: string
       enum:
         - tv
@@ -889,7 +1465,7 @@ components:
         - game
         - book
         - comic
-    CompleteMediaType:
+    MediaTypesComplete:
       type: string
       enum:
         - tv
@@ -901,6 +1477,33 @@ components:
         - game
         - book
         - comic
+    MovieDetails:
+      type: object
+      properties:
+        format:
+          type: string
+        release_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        status:
+          type: string
+        runtime:
+          type: string
+          description: Human formatted duration (1h 20m)
+        studios:
+          type: array
+          items:
+            type: string
+        country:
+          type: string
+        languages:
+          type: array
+          items:
+            type: string
+    MovieRelated:
+      type: object
+      nullable: true
     PaginatedCalendar:
       type: object
       properties:
@@ -910,6 +1513,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CalendarEvent"
+    PaginatedHistory:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/History"
     PaginatedMedia:
       type: object
       properties:
@@ -947,6 +1559,22 @@ components:
           format: uri
           nullable: true
           description: The previous page URL with updated offset
+    RelatedMedia:
+      type: array
+      items:
+        type: object
+        properties:
+          source:
+            $ref: "#/components/schemas/Source"
+          media_type:
+            $ref: "#/components/schemas/MediaTypes"
+          image:
+            type: string
+            format: uri
+          media_id:
+            type: integer
+          title:
+            type: string
     SearchItem:
       type: object
       properties:
@@ -955,7 +1583,7 @@ components:
         source:
           $ref: "#/components/schemas/Source"
         media_type:
-          $ref: "#/components/schemas/MediaType"
+          $ref: "#/components/schemas/MediaTypes"
         title:
           type: string
         image:
@@ -1067,3 +1695,67 @@ components:
         timeline:
           type: object
           description: Timeline of media consumption by month
+    TVDetails:
+      type: object
+      properties:
+        format:
+          type: string
+        release_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        status:
+          type: string
+        runtime:
+          type: string
+          description: Human formatted duration (1h 20m)
+        studios:
+          type: array
+          items:
+            type: string
+        country:
+          type: string
+        languages:
+          type: array
+          items:
+            type: string
+        tvdb_id:
+          type: integer
+        last_episode_season:
+          type: integer
+        next_episode_season:
+          type: integer
+          nullable: true
+    TVRelated:
+      type: object
+      description: Related media items
+      nullable: true
+      properties:
+        seasons:
+          type: object
+          description: Related seasons (for TV shows and animes)
+          properties:
+            item_id:
+              $ref: "#/components/schemas/ItemId"
+              description: ItemId of the season (type/source/media_id/season_number)
+            source:
+              type: string
+            media_type:
+              type: string
+            image:
+              type: string
+              format: uri
+            media_id:
+              type: integer
+            title:
+              type: string
+            season_number:
+              type: integer
+            season_title:
+              type: string
+            first_air_date:
+              type: string
+              format: date
+              description: Date in YYYY-MM-DD format
+            max_progress:
+              type: integer
