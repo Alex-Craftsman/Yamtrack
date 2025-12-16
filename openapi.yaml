@@ -11,6 +11,7 @@ security:
   - bearerAuth: []
 tags:
   - name: calendar
+  - name: history
   - name: lists
   - name: media
   - name: search
@@ -73,6 +74,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/calendar/update/:
     post:
       tags:
@@ -85,6 +98,111 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BasicResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/history/{media_type}/{history_id}/:
+    get:
+      tags:
+        - history
+      summary: Retrieve a specific history record by media type and history id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: history_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryRecord"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags:
+        - history
+      summary: Delete a specific history record by media type and history id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: history_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/lists/:
     get:
       tags:
@@ -280,8 +398,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -336,6 +472,24 @@ paths:
                 $ref: "#/components/schemas/PaginatedMedia"
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -396,6 +550,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal Server Error
           content:
@@ -432,6 +598,12 @@ paths:
                 $ref: "#/components/schemas/CompleteMedia"
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
           content:
             application/json:
               schema:
@@ -479,8 +651,28 @@ paths:
           description: Updated
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     delete:
       tags:
         - media
@@ -506,12 +698,33 @@ paths:
           description: No Content
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/history/:
     get:
       tags:
         - media
+        - history
       summary: Get history records for a media item
       parameters:
         - in: path
@@ -561,53 +774,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/media/{media_type}/{source}/{media_id}/history/{history_id}/:
-    delete:
-      tags:
-        - media
-      summary: Delete a specific history record for a media item
-      parameters:
-        - in: path
-          name: media_type
-          required: true
-          schema:
-            $ref: "#/components/schemas/MediaTypes"
-        - in: path
-          name: source
-          required: true
-          schema:
-            $ref: "#/components/schemas/Source"
-        - in: path
-          name: media_id
-          required: true
-          schema:
-            type: integer
-        - in: path
-          name: history_id
-          required: true
-          schema:
-            type: integer
-      responses:
-        "204":
-          description: No Content
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BasicResponse"
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -642,6 +816,30 @@ paths:
       responses:
         "204":
           description: Added
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     delete:
       tags:
         - lists
@@ -670,6 +868,30 @@ paths:
       responses:
         "204":
           description: Removed
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/recommendations/:
     get:
       tags:
@@ -700,6 +922,12 @@ paths:
                 $ref: "#/components/schemas/RelatedMedia"
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
           content:
             application/json:
               schema:
@@ -750,6 +978,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not Found
           content:
@@ -786,6 +1020,30 @@ paths:
       responses:
         "202":
           description: Sync triggered
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/:
     get:
       tags:
@@ -821,6 +1079,12 @@ paths:
                 $ref: "#/components/schemas/CompleteMedia"
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
           content:
             application/json:
               schema:
@@ -872,6 +1136,12 @@ paths:
                 $ref: "#/components/schemas/PaginatedMedia"
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
           content:
             application/json:
               schema:
@@ -928,6 +1198,12 @@ paths:
                 $ref: "#/components/schemas/CompleteMedia"
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
           content:
             application/json:
               schema:
@@ -994,6 +1270,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/statistics/:
     get:
       tags:
@@ -1019,6 +1307,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StatisticsResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -1073,18 +1379,15 @@ components:
           $ref: "#/components/schemas/Item"
         item_id:
           $ref: "#/components/schemas/ItemId"
-        title:
-          type: string
-        media_type:
-          type: string
-        image:
-          type: string
-          format: uri
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
         content_number:
           type: integer
         datetime:
           type: string
           format: date-time
+        notification_sent:
+          type: boolean
     ComicDetails:
       type: object
       properties:
@@ -1364,6 +1667,62 @@ components:
                 type: string
                 description: The value after the change
                 nullable: true
+    HistoryRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The history change id
+        timestamp:
+          type: string
+          format: timestamp
+          description: The timestamp of the change
+        type:
+          $ref: "#/components/schemas/HistoryRecordType"
+          description: The type of change
+        change_reason:
+          type: string
+          description: The reason of the change
+          nullable: true
+        score:
+          type: number
+          description: The new score
+          nullable: true
+        progress:
+          type: integer
+          description: The progress value
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        start_date:
+          type: string
+          format: timestamp
+          description: The start date of the media
+          nullable: true
+        end_date:
+          type: string
+          format: timestamp
+          description: The end date of the media
+          nullable: true
+        notes:
+          type: string
+          description: The notes added to the media
+          nullable: true
+    HistoryRecordType:
+      type: integer
+      enum:
+        - 0
+        - 1
+        - 2
+      x-enumNames:
+        - Removed
+        - Changed
+        - Added
+      description: |
+        Integer mapping for HistoryType:
+          0 = Removed
+          1 = Changed
+          2 = Added
     Item:
       type: object
       properties:
@@ -1411,6 +1770,7 @@ components:
         parent_id:
           $ref: "#/components/schemas/ItemId"
           description: If the Item is a Season or an Episode, the parent_id is the id of the Serie or of the Season
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -1454,7 +1814,6 @@ components:
           2 = Paused
           3 = Completed
           4 = Dropped
-      nullable: true
     MediaTypes:
       type: string
       enum:

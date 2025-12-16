@@ -18,6 +18,19 @@ def delete_entry(media_type, history_id, user):
     ).delete()
 
 
+def get_entry(media_type, history_id, user):
+    """Retrieve and serialize a history entry for a given media type and user."""
+    historical_model = apps.get_model(
+        app_label="app",
+        model_name=f"historical{media_type.lower()}",
+    )
+
+    return historical_model.objects.get(
+        history_id=history_id,
+        history_user=user,
+    )
+
+
 def process_history_entries(history_records, media_type):
     """Process history records into structured API timeline entries."""
     timeline_entries = []

@@ -42,14 +42,55 @@ from .helpers import (
     parse_limit_offset,
     parse_sort_filter,
 )
-from .history_processor import delete_entry, process_history_entries
-from .serializers import MediaSerializer, TimelineItemSerializer
+from .history_processor import delete_entry, get_entry, process_history_entries
+from .serializers import HistoryEntrySerializer, MediaSerializer, TimelineItemSerializer
 
 # TODO!!!: Implement seasons and episodes
 # - tv type has children seasons
 # - season type has parent tv and children episodes (tv/source/id/season)
 # - episode type has parent season (tv/source/id/season/episode)
 # serializers need to be updated to include nested relationships, and also the logic for seasons and episodes in the views
+
+
+# /api/v1/history/[media_type]/[history_id]
+class MediaTypeHistoryDetailView(drf_views.APIView):
+    """Operations on a specific history entry for a given media type."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, history_id):
+        """Retrieve the history record for a specific media."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        try:
+            history_entry = get_entry(media_type, history_id, request.user)
+            serialized = HistoryEntrySerializer(history_entry)
+            return Response(serialized.data, status=200)
+
+        except Exception as e:
+            return Response(
+                {"detail": "Record not found", "errors": str(e)}, status=404,
+            )
+
+    def delete(self, request, media_type, history_id):
+        """Delete the history record for a specific media."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        try:
+            delete_entry(media_type, history_id, request.user)
+            return Response({"detail": "Record removed correctly"}, status=204)
+        except Exception as e:
+            return Response(
+                {"detail": "Record not found", "errors": str(e)}, status=404
+            )
 
 
 # /api/v1/media/
@@ -548,38 +589,6 @@ class MediaHistoryView(drf_views.APIView):
             "history",
         )
         return Response(paginated_data)
-
-
-# /api/v1/media/[media_type]/[source]/[media_id]/history/[history_id]
-class MediaHistoryDetailView(drf_views.APIView):
-    """Delete the history record for a specific media."""
-
-    # TODO?: Should this be available at `/api/v1/history/[history_id]` since the history_id is not based on specific media?
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    def delete(self, request, media_type, source, media_id, history_id):
-        if not check_valid_type(media_type):
-            return Response(
-                {"detail": "Bad Request. Unsupported media type."},
-                status=400,
-            )
-
-        if not check_source_type(media_type, source):
-            return Response(
-                {
-                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
-                },
-                status=400,
-            )
-
-        try:
-            delete_entry(media_type, history_id, request.user)
-            return Response({"detail": "Record removed correctly"}, status=204)
-        except Exception as e:
-            return Response(
-                {"detail": "Record not found", "errors": str(e)}, status=404
-            )
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/sync/
