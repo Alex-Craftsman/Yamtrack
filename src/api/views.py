@@ -52,6 +52,92 @@ from .serializers import HistoryEntrySerializer, MediaSerializer, TimelineItemSe
 # serializers need to be updated to include nested relationships, and also the logic for seasons and episodes in the views
 
 
+# /api/v1/calendar/
+class CalendarView(drf_views.APIView):
+    """Retrieve calendar events for the authenticated user."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        start_date = request.GET.get("start_date")
+        end_date = request.GET.get("end_date")
+        month_q = request.GET.get("month")
+        year_q = request.GET.get("year")
+
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        if start_date:
+            if end_date:
+                try:
+                    start_date_parsed = parse_date(start_date)
+                    end_date_parsed = parse_date(end_date)
+                    if not start_date_parsed or not end_date_parsed:
+                        raise ValueError("Invalid date format")
+                    first_day = start_date_parsed
+                    last_day = end_date_parsed
+                except (TypeError, ValueError):
+                    return Response(
+                        {"detail": "Bad Request. Invalid date format."},
+                        status=400,
+                    )
+            else:
+                try:
+                    start_date_parsed = parse_date(start_date)
+                    if not start_date_parsed:
+                        raise ValueError("Invalid date format")
+                    first_day = start_date_parsed
+                    last_day = timezone.localdate()
+                except (TypeError, ValueError):
+                    return Response(
+                        {"detail": "Bad Request. Invalid date format."},
+                        status=400,
+                    )
+        else:
+            try:
+                if month_q and year_q:
+                    current = date(int(year_q), int(month_q), 1)
+                else:
+                    current = timezone.localdate()
+            except (TypeError, ValueError):
+                current = timezone.localdate()
+
+            month = current.month
+            year = current.year
+
+            is_december = month == 12
+
+            first_day = date(year, month, 1)
+            if is_december:
+                last_day = date(year, 12, 31)
+            else:
+                last_day = date(year, month + 1, 1) - timedelta(days=1)
+
+        try:
+            releases = Event.objects.get_user_events(request.user, first_day, last_day)
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        paginated_data = paginate_data(request, releases, limit, offset, "events")
+
+        return Response(paginated_data)
+
+
+# /api/v1/calendar/update/
+class UpdateCalendarView(drf_views.APIView):
+    """Trigger calendar events update for the authenticated user."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        tasks.reload_calendar.delay(request.user)
+        return Response({"detail": "Accepted. Task queued"}, status=202)
+
+
 # /api/v1/history/[media_type]/[history_id]
 class MediaTypeHistoryDetailView(drf_views.APIView):
     """Operations on a specific history entry for a given media type."""
@@ -93,6 +179,39 @@ class MediaTypeHistoryDetailView(drf_views.APIView):
                 {"detail": "Record not found", "errors": str(e)},
                 status=404,
             )
+
+
+# /api/v1/lists/
+class ListsView(drf_views.APIView):
+    def get(self, request):
+        return Response({"detail": "Not implemented"}, status=501)
+
+    def post(self, request):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/lists/[id]/
+class ListDetailView(drf_views.APIView):
+    def get(self, request, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+    def patch(self, request, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+    def delete(self, request, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/lists/[id]/items/
+class ListAddItemView(drf_views.APIView):
+    def post(self, request, id):
+        return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/lists/[id]/items/[item_id]/
+class ListRemoveItemView(drf_views.APIView):
+    def delete(self, request, id, item_id):
+        return Response({"detail": "Not implemented"}, status=501)
 
 
 # /api/v1/media/
@@ -842,122 +961,3 @@ class StatisticsView(drf_views.APIView):
         }
 
         return Response(statistics, status=200)
-
-
-# /api/v1/lists/
-class ListsView(drf_views.APIView):
-    def get(self, request):
-        return Response({"detail": "Not implemented"}, status=501)
-
-    def post(self, request):
-        return Response({"detail": "Not implemented"}, status=501)
-
-
-# /api/v1/lists/[id]/
-class ListDetailView(drf_views.APIView):
-    def get(self, request, id):
-        return Response({"detail": "Not implemented"}, status=501)
-
-    def patch(self, request, id):
-        return Response({"detail": "Not implemented"}, status=501)
-
-    def delete(self, request, id):
-        return Response({"detail": "Not implemented"}, status=501)
-
-
-# /api/v1/lists/[id]/items/
-class ListAddItemView(drf_views.APIView):
-    def post(self, request, id):
-        return Response({"detail": "Not implemented"}, status=501)
-
-
-# /api/v1/lists/[id]/items/[item_id]/
-class ListRemoveItemView(drf_views.APIView):
-    def delete(self, request, id, item_id):
-        return Response({"detail": "Not implemented"}, status=501)
-
-
-# /api/v1/calendar/
-class CalendarView(drf_views.APIView):
-    """Retrieve calendar events for the authenticated user."""
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        start_date = request.GET.get("start_date")
-        end_date = request.GET.get("end_date")
-        month_q = request.GET.get("month")
-        year_q = request.GET.get("year")
-
-        limit, offset, err = parse_limit_offset(request)
-        if err:
-            return err
-
-        if start_date:
-            if end_date:
-                try:
-                    start_date_parsed = parse_date(start_date)
-                    end_date_parsed = parse_date(end_date)
-                    if not start_date_parsed or not end_date_parsed:
-                        raise ValueError("Invalid date format")
-                    first_day = start_date_parsed
-                    last_day = end_date_parsed
-                except (TypeError, ValueError):
-                    return Response(
-                        {"detail": "Bad Request. Invalid date format."},
-                        status=400,
-                    )
-            else:
-                try:
-                    start_date_parsed = parse_date(start_date)
-                    if not start_date_parsed:
-                        raise ValueError("Invalid date format")
-                    first_day = start_date_parsed
-                    last_day = timezone.localdate()
-                except (TypeError, ValueError):
-                    return Response(
-                        {"detail": "Bad Request. Invalid date format."},
-                        status=400,
-                    )
-        else:
-            try:
-                if month_q and year_q:
-                    current = date(int(year_q), int(month_q), 1)
-                else:
-                    current = timezone.localdate()
-            except (TypeError, ValueError):
-                current = timezone.localdate()
-
-            month = current.month
-            year = current.year
-
-            is_december = month == 12
-
-            first_day = date(year, month, 1)
-            if is_december:
-                last_day = date(year, 12, 31)
-            else:
-                last_day = date(year, month + 1, 1) - timedelta(days=1)
-
-        try:
-            releases = Event.objects.get_user_events(request.user, first_day, last_day)
-        except Exception as e:
-            return Response(
-                {"detail": "Internal Server Error", "errors": str(e)},
-                status=500,
-            )
-
-        paginated_data = paginate_data(request, releases, limit, offset, "events")
-
-        return Response(paginated_data)
-
-
-# /api/v1/calendar/update/
-class UpdateCalendarView(drf_views.APIView):
-    """Trigger calendar events update for the authenticated user."""
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        tasks.reload_calendar.delay(request.user)
-        return Response({"detail": "Accepted. Task queued"}, status=202)
