@@ -1105,6 +1105,88 @@ class MediaSeasonHistoryView(drf_views.APIView):
         return Response(paginated_data)
 
 
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/sync/
+class MediaSeasonSyncView(drf_views.APIView):
+    """Sync metadata from provider for a specific season of a tv serie."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, media_type, source, media_id, season_number):
+        """Trigger sync of metadata from provider (non-manual sources only)."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": "Bad Request. Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if source == Sources.MANUAL.value:
+            return Response(
+                {"detail": "Bad Request. Manual items cannot be synced."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot sync `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        cache_key = f"{source}_season_{media_id}_{season_number}"
+
+        ttl = cache.ttl(cache_key)
+        if ttl is not None and ttl > (settings.CACHE_TIMEOUT - 3):
+            return Response(
+                {
+                    "detail": "Conflict. The data was recently synced, please wait a few seconds.",
+                },
+                status=409,
+            )
+
+        cache.delete(cache_key)
+
+        try:
+            metadata = services.get_media_metadata(
+                "season",
+                media_id,
+                source,
+                [season_number],
+            )
+
+            item, _ = Item.objects.update_or_create(
+                media_id=media_id,
+                source=source,
+                media_type="season",
+                season_number=season_number,
+                defaults={
+                    "title": metadata["title"],
+                    "image": metadata["image"],
+                },
+            )
+
+            item.fetch_releases(delay=False)
+
+            return Response(
+                {"detail": "Accepted. Metadata synced successfully."},
+                status=202,
+            )
+
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+
 # /api/v1/search/[media_type]/
 class SearchProviderView(drf_views.APIView):
     """Search for media using the specified provider."""
