@@ -124,6 +124,7 @@ def make_page_url(request, limit, new_offset):
 
 
 def paginate_data(request, results, limit, offset, data_type):
+    # TODO!: create better pagination function, with all possible serializers, and type handling
     """Paginate the results based on the limit and offset."""
     total = len(results)
     start = offset
@@ -161,7 +162,7 @@ def paginate_data(request, results, limit, offset, data_type):
         "previous": prev_url,
     }
     results_payload = (
-        serialized_data if data_type in ("media", "history") else serialized.data
+        serialized_data if data_type in ("media", "history", "seasons", "episodes") else serialized.data
     )
     return {"pagination": pagination, "results": results_payload}
 

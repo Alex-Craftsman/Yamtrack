@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.3
+  version: 0.0.5
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -231,7 +231,7 @@ paths:
       summary: Get list details
       parameters:
         - in: path
-          name: id
+          name: list_id
           required: true
           schema:
             type: integer
@@ -244,7 +244,7 @@ paths:
       summary: Edit a list
       parameters:
         - in: path
-          name: id
+          name: list_id
           required: true
           schema:
             type: integer
@@ -263,7 +263,7 @@ paths:
       summary: Delete a list
       parameters:
         - in: path
-          name: id
+          name: list_id
           required: true
           schema:
             type: integer
@@ -277,16 +277,10 @@ paths:
       summary: List list items
       parameters:
         - in: path
-          name: id
+          name: list_id
           required: true
           schema:
             type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
       responses:
         "204":
           description: OK
@@ -296,7 +290,7 @@ paths:
       summary: Add an Item to a list
       parameters:
         - in: path
-          name: id
+          name: list_id
           required: true
           schema:
             type: integer
@@ -316,7 +310,7 @@ paths:
       summary: Get an Item from a list
       parameters:
         - in: path
-          name: id
+          name: list_id
           required: true
           schema:
             type: integer
@@ -334,7 +328,7 @@ paths:
       summary: Remove an Item from a list
       parameters:
         - in: path
-          name: id
+          name: list_id
           required: true
           schema:
             type: integer
@@ -965,13 +959,27 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedMedia"
+                $ref: "#/components/schemas/PaginatedSeasons"
         "400":
           description: Bad Request
           content:
@@ -1127,6 +1135,20 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
       responses:
         "200":
           description: OK
@@ -1134,6 +1156,77 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/history:
+    get:
+      tags:
+        - media
+        - history
+      summary: Get history records for a season
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedHistory"
         "400":
           description: Bad Request
           content:
@@ -1461,20 +1554,22 @@ components:
         score_count:
           type: integer
         details:
-        # TODO: missing tv serie & tv episode
+        # TODO: missing tv episode
           oneOf:
             - $ref: "#/components/schemas/MovieDetails"
             - $ref: "#/components/schemas/TVDetails"
+            - $ref: "#/components/schemas/SeasonDetails"
             - $ref: "#/components/schemas/AnimeDetails"
             - $ref: "#/components/schemas/MangaDetails"
             - $ref: "#/components/schemas/GameDetails"
             - $ref: "#/components/schemas/BookDetails"
             - $ref: "#/components/schemas/ComicDetails"
         related:
-        # TODO: missing tv serie & tv episode
+        # TODO: missing tv episode
           oneOf:
             - $ref: "#/components/schemas/MovieRelated"
             - $ref: "#/components/schemas/TVRelated"
+            - $ref: "#/components/schemas/SeasonRelated"
             - $ref: "#/components/schemas/AnimeRelated"
             - $ref: "#/components/schemas/MangaRelated"
             - $ref: "#/components/schemas/GameRelated"
@@ -1563,15 +1658,76 @@ components:
         episode_number:
           type: integer
           nullable: true
-    CreateMediaOfType:
+    CrewMember:
       type: object
       properties:
-        title:
+        job:
           type: string
-        image:
+        department:
           type: string
-      required:
-        - title
+        credit_id:
+          type: string
+        adult:
+          type: boolean
+        gender:
+          type: integer
+        id:
+          type: integer
+        known_for_department:
+          type: string
+        name:
+          type: string
+        original_name:
+          type: string
+        popularity:
+          type: number
+          format: float
+        profile_path:
+          type: string
+    Episode:
+      type: object
+      properties:
+        air_date:
+          type: string
+          format: date
+        episode_number:
+          type: integer
+        episode_type:
+          type: string
+        id:
+          type: integer
+        name:
+          type: string
+        overview:
+          type: string
+        production_code:
+          type: string
+        runtime:
+          type: integer
+        season_number:
+          type: integer
+        show_id:
+          type: integer
+        still_path:
+          type: string
+          nullable: true
+        vote_average:
+          type: number
+          format: float
+        vote_count:
+          type: integer
+        crew:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrewMember"
+        guest_stars:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuestStar"
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
     ErrorResponse:
       type: object
       properties:
@@ -1641,6 +1797,33 @@ components:
           type: array
           items:
             type: string
+    GuestStar:
+      type: object
+      properties:
+        character:
+          type: string
+        credit_id:
+          type: string
+        order:
+          type: integer
+        adult:
+          type: boolean
+        gender:
+          type: integer
+        id:
+          type: integer
+        known_for_department:
+          type: string
+        name:
+          type: string
+        original_name:
+          type: string
+        popularity:
+          type: number
+          format: float
+        profile_path:
+          type: string
+          nullable: true
     History:
       type: object
       properties:
@@ -1990,6 +2173,35 @@ components:
           $ref: "#/components/schemas/ItemId"
         parent_id:
           $ref: "#/components/schemas/ItemId"
+    SeasonDetails:
+      type: object
+      properties:
+        first_air_date:
+          type: string
+          format: date
+          description: Date of the first air date of the season (YYYY-MM-DD)
+        last_air_date:
+          type: string
+          format: date
+          description: Date of the last air date of the season (YYYY-MM-DD)
+        episodes:
+          type: integer
+          description: Number of episodes of the season
+        runtime:
+          type: string
+          description: Human readable episode duration
+        total_runtime:
+          type: string
+          description: Human readable season duration
+        tvdb_id:
+          type: number
+    SeasonRelated:
+      type: object
+      properties:
+        episodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Episode"
     SortOptions:
       type: string
       enum:
@@ -2021,7 +2233,66 @@ components:
         - type_desc
         - updated_asc
         - updated_desc
-      description: season sorts are supported only for seasons and episodes, episode sorts are supported only for episodes
+      x-enumNames:
+        - Added Ascending
+        - Added Descending
+        - Ended Ascending
+        - Ended Descending
+        - Episode Ascending
+        - Episode Descending
+        - ID Ascending
+        - ID Descending
+        - Item ID Ascending
+        - Item ID Descending
+        - Media ID Ascending
+        - Media ID Descending
+        - Progress Ascending
+        - Progress Descending
+        - Score Ascending
+        - Score Descending
+        - Season Ascending
+        - Season Descending
+        - Source Ascending
+        - Source Descending
+        - Started Ascending
+        - Started Descending
+        - Title Ascending
+        - Title Descending
+        - Type Ascending
+        - Type Descending
+        - Updated Ascending
+        - Updated Descending
+      description: |
+        Mapping for sort options:
+          added_asc = Added Ascending
+          added_desc = Added Descending
+          ended_asc = Ended Ascending
+          ended_desc = Ended Descending
+          episode_asc = Episode Ascending
+          episode_desc = Episode Descending
+          id_asc = ID Ascending
+          id_desc = ID Descending
+          itemid_asc = Item ID Ascending
+          itemid_desc = Item ID Descending
+          mediaid_asc = Media ID Ascending
+          mediaid_desc = Media ID Descending
+          progress_asc = Progress Ascending
+          progress_desc = Progress Descending
+          score_asc = Score Ascending
+          score_desc = Score Descending
+          season_asc = Season Ascending
+          season_desc = Season Descending
+          source_asc = Source Ascending
+          source_desc = Source Descending
+          started_asc = Started Ascending
+          started_desc = Started Descending
+          title_asc = Title Ascending
+          title_desc = Title Descending
+          type_asc = Type Ascending
+          type_desc = Type Descending
+          updated_asc = Updated Ascending
+          updated_desc = Updated Descending
+        Note: Season sorts are supported only for seasons and episodes, episode sorts are supported only for episodes
     Source:
       type: string
       enum:
@@ -2133,30 +2404,32 @@ components:
       nullable: true
       properties:
         seasons:
-          type: object
-          description: Related seasons (for TV shows and animes)
-          properties:
-            item_id:
-              $ref: "#/components/schemas/ItemId"
-              description: ItemId of the season (type/source/media_id/season_number)
-            source:
-              type: string
-            media_type:
-              type: string
-            image:
-              type: string
-              format: uri
-            media_id:
-              type: integer
-            title:
-              type: string
-            season_number:
-              type: integer
-            season_title:
-              type: string
-            first_air_date:
-              type: string
-              format: date
-              description: Date in YYYY-MM-DD format
-            max_progress:
-              type: integer
+          type: array
+          description: Related seasons
+          items:
+            type: object
+            properties:
+              item_id:
+                $ref: "#/components/schemas/ItemId"
+                description: ItemId of the season (type/source/media_id/season_number)
+              source:
+                type: string
+              media_type:
+                type: string
+              image:
+                type: string
+                format: uri
+              media_id:
+                type: integer
+              title:
+                type: string
+              season_number:
+                type: integer
+              season_title:
+                type: string
+              first_air_date:
+                type: string
+                format: date
+                description: Date in YYYY-MM-DD format
+              max_progress:
+                type: integer

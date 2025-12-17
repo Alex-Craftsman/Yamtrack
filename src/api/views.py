@@ -12,7 +12,7 @@ from rest_framework.response import Response
 
 from app.forms import ManualItemForm, get_form_class
 from app.models import BasicMedia, Item, MediaTypes, Sources
-from app.providers import services, tmdb
+from app.providers import services
 from app.statistics import (
     get_activity_data,
     get_media_type_distribution,
@@ -626,7 +626,7 @@ class MediaDetailView(drf_views.APIView):
                 details["last_issue_id"] = media_metadata.pop("last_issue_id")
             media_metadata["details"] = details
 
-        return Response(media_metadata)
+        return Response(media_metadata, status=200)
 
     def patch(self, request, media_type, source, media_id):
         return Response({"detail": "Not Implemented"}, status=501)
@@ -735,6 +735,10 @@ class MediaSeasonsView(drf_views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id):
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
         if not check_valid_type(media_type):
             return Response(
                 {"detail": "Bad Request. Unsupported media type."},
@@ -781,7 +785,8 @@ class MediaSeasonsView(drf_views.APIView):
                 )
                 season["parent_id"] = f"{media_type}/{source}/{media_id}"
 
-        return Response(seasons, status=200)
+        paginated = paginate_data(request, seasons, limit, offset, "seasons")
+        return Response(paginated, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/sync/
@@ -817,7 +822,9 @@ class MediaSyncView(drf_views.APIView):
         ttl = cache.ttl(cache_key)
         if ttl is not None and ttl > (settings.CACHE_TIMEOUT - 3):
             return Response(
-                {"detail": "Conflict. The data was recently synced, please wait a few seconds."},
+                {
+                    "detail": "Conflict. The data was recently synced, please wait a few seconds.",
+                },
                 status=409,
             )
 
@@ -861,6 +868,241 @@ class MediaAddToListView(drf_views.APIView):
 
     def delete(self, request, media_type, source, media_id):
         return Response({"detail": "Not implemented"}, status=501)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/
+class MediaSeasonDetailView(drf_views.APIView):
+    """Operations on a specific season of a tv serie for the authenticated user."""
+
+    serializer_class = MediaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, media_id, season_number):
+        """Retrieve details of a specific season for the authenticated user."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": "Bad Request. Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            media_metadata = services.get_media_metadata(
+                "season",
+                media_id,
+                source,
+                [season_number],
+            )
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        if not media_metadata:
+            return Response(
+                {"detail": "Not Found. Season not found."},
+                status=404,
+            )
+
+        tracked = False
+        created = ""
+        score = ""
+        progress = ""
+        progressed_at = ""
+        status = ""
+        start_date = ""
+        end_date = ""
+        notes = ""
+
+        try:
+            user_medias = BasicMedia.objects.filter_media_prefetch(
+                user,
+                media_id,
+                "season",
+                source,
+                season_number=season_number,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        episodes = []
+        if "episodes" in media_metadata and media_metadata["episodes"] is not None:
+            episodes = media_metadata.pop("episodes")
+            for episode in episodes:
+                episode["item_id"] = (
+                    f"{media_type}/{source}/{media_id}/{season_number}/{episode.get('episode_number')}"
+                )
+                episode["parent_id"] = (
+                    f"{media_type}/{source}/{media_id}/{season_number}"
+                )
+
+        if user_medias:
+            serialized = MediaSerializer(user_medias[0]).data
+            tracked = True
+            created = serialized["created_at"]
+            score = serialized["score"]
+            progress = serialized["progress"]
+            progressed_at = serialized["progressed_at"]
+            status = serialized["status"]
+            start_date = serialized["start_date"]
+            end_date = serialized["end_date"]
+            notes = serialized["notes"]
+
+        media_metadata["related"] = {"episodes": episodes}
+        media_metadata["item_id"] = f"{media_type}/{source}/{media_id}/{season_number}"
+        media_metadata["parent_id"] = f"{media_type}/{source}/{media_id}"
+        media_metadata["tracked"] = tracked
+        media_metadata["user_created"] = created
+        media_metadata["user_score"] = score
+        media_metadata["user_progress"] = progress
+        media_metadata["user_progressed_at"] = progressed_at
+        media_metadata["user_status"] = status
+        media_metadata["user_start_date"] = start_date
+        media_metadata["user_end_date"] = end_date
+        media_metadata["user_notes"] = notes
+
+        return Response(media_metadata, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/episodes/
+class MediaSeasonEpisodesView(drf_views.APIView):
+    """Retrieve the episodes for a specific season of a tv serie."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, media_id, season_number):
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": "Bad Request. Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            media_metadata = services.get_media_metadata(
+                "season",
+                media_id,
+                source,
+                [season_number],
+            )
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        episodes = []
+        if "episodes" in media_metadata and media_metadata["episodes"] is not None:
+            episodes = media_metadata["episodes"] or []
+            for episode in episodes:
+                episode["item_id"] = (
+                    f"{media_type}/{source}/{media_id}/{season_number}/{episode.get('episode_number')}"
+                )
+                episode["parent_id"] = f"{media_type}/{source}/{media_id}/{season_number}"
+
+        paginated = paginate_data(request, episodes, limit, offset, "episodes")
+        return Response(paginated, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/
+class MediaSeasonHistoryView(drf_views.APIView):
+    """Retrieve the history timeline for a specific season of a tv serie."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, media_id, season_number):
+        """Retrieve history timeline entries for a specific season of a tv serie."""
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": "Bad Request. Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        user_medias = BasicMedia.objects.filter_media(
+            request.user,
+            media_id,
+            "season",
+            source,
+            season_number=season_number,
+        )
+
+        timeline_entries = []
+        if user_medias.exists():
+            timeline_entries = [
+                entry
+                for media in user_medias
+                if (history := media.history.all())
+                for entry in process_history_entries(history, "season")
+            ]
+
+        paginated_data = paginate_data(
+            request,
+            timeline_entries,
+            limit,
+            offset,
+            "history",
+        )
+        return Response(paginated_data)
 
 
 # /api/v1/search/[media_type]/
