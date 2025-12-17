@@ -1,5 +1,7 @@
 from datetime import date, timedelta
 
+from django.conf import settings
+from django.core.cache import cache
 from django.db import IntegrityError
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -10,7 +12,7 @@ from rest_framework.response import Response
 
 from app.forms import ManualItemForm, get_form_class
 from app.models import BasicMedia, Item, MediaTypes, Sources
-from app.providers import services
+from app.providers import services, tmdb
 from app.statistics import (
     get_activity_data,
     get_media_type_distribution,
@@ -784,10 +786,72 @@ class MediaSeasonsView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/sync/
 class MediaSyncView(drf_views.APIView):
+    """Sync metadata from provider for a specific media (refresh cache and update item/episodes)."""
+
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, media_type, source, media_id):
-        return Response({"detail": "Not implemented"}, status=501)
+        """Trigger sync of metadata from provider (non-manual sources only)."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if source == Sources.MANUAL.value:
+            return Response(
+                {"detail": "Bad Request. Manual items cannot be synced."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot sync `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        cache_key = f"{source}_{media_type}_{media_id}"
+
+        ttl = cache.ttl(cache_key)
+        if ttl is not None and ttl > (settings.CACHE_TIMEOUT - 3):
+            return Response(
+                {"detail": "Conflict. The data was recently synced, please wait a few seconds."},
+                status=409,
+            )
+
+        cache.delete(cache_key)
+
+        try:
+            metadata = services.get_media_metadata(
+                media_type,
+                media_id,
+                source,
+            )
+
+            item, _ = Item.objects.update_or_create(
+                media_id=media_id,
+                source=source,
+                media_type=media_type,
+                defaults={
+                    "title": metadata["title"],
+                    "image": metadata["image"],
+                },
+            )
+
+            item.fetch_releases(delay=False)
+
+            return Response(
+                {"detail": "Accepted. Metadata synced successfully."},
+                status=202,
+            )
+
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/lists/
