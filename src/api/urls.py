@@ -57,6 +57,11 @@ urlpatterns = [
         name="api_media_recommendations",
     ),
     re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/seasons/?$",
+        views.MediaSeasonsView.as_view(),
+        name="api_media_seasons",
+    ),
+    re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/sync/?$",
         views.MediaSyncView.as_view(),
         name="api_media_sync",

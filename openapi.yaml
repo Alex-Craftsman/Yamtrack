@@ -1899,6 +1899,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SearchItem"
+    PaginatedSeasons:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Season"
     Pagination:
       type: object
       properties:
@@ -1948,6 +1957,39 @@ components:
         image:
           type: string
           format: uri
+    Season:
+      type: object
+      properties:
+        source:
+          $ref: "#/components/schemas/Source"
+        media_type:
+          type: string
+          enum:
+            - season
+          description: Always "season"
+        image:
+          type: string
+          format: uri
+          nullable: true
+        media_id:
+          type: integer
+        title:
+          type: string
+        season_number:
+          type: integer
+        season_title:
+          type: string
+        first_air_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+          nullable: true
+        max_progress:
+          type: integer
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
     SortOptions:
       type: string
       enum:

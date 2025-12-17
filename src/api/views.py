@@ -73,7 +73,8 @@ class MediaTypeHistoryDetailView(drf_views.APIView):
 
         except Exception as e:
             return Response(
-                {"detail": "Record not found", "errors": str(e)}, status=404,
+                {"detail": "Record not found", "errors": str(e)},
+                status=404,
             )
 
     def delete(self, request, media_type, history_id):
@@ -89,7 +90,8 @@ class MediaTypeHistoryDetailView(drf_views.APIView):
             return Response({"detail": "Record removed correctly"}, status=204)
         except Exception as e:
             return Response(
-                {"detail": "Record not found", "errors": str(e)}, status=404
+                {"detail": "Record not found", "errors": str(e)},
+                status=404,
             )
 
 
@@ -447,6 +449,19 @@ class MediaDetailView(drf_views.APIView):
         ):
             media_metadata["related"].pop("recommendations")
 
+        if (
+            media_type == MediaTypes.TV.value
+            and "related" in media_metadata
+            and media_metadata["related"] is not None
+            and "seasons" in media_metadata["related"]
+            and media_metadata["related"]["seasons"] is not None
+        ):
+            for season in media_metadata["related"]["seasons"]:
+                season["item_id"] = (
+                    f"{media_type}/{source}/{media_id}/{season.get('season_number')}"
+                )
+                season["parent_id"] = f"{media_type}/{source}/{media_id}"
+
         if user_medias:
             serialized = MediaSerializer(user_medias[0]).data
             tracked = True
@@ -460,6 +475,7 @@ class MediaDetailView(drf_views.APIView):
             notes = serialized["notes"]
 
         media_metadata["item_id"] = f"{media_type}/{source}/{media_id}"
+        media_metadata["parent_id"] = None
         media_metadata["tracked"] = tracked
         media_metadata["user_created"] = created
         media_metadata["user_score"] = score
@@ -589,6 +605,62 @@ class MediaHistoryView(drf_views.APIView):
             "history",
         )
         return Response(paginated_data)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/seasons/
+class MediaSeasonsView(drf_views.APIView):
+    """Retrieve the history timeline for a specific media."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, media_id):
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": "Bad Request. Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": "Bad Request. Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            media_metadata = services.get_media_metadata(media_type, media_id, source)
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error", "errors": str(e)},
+                status=500,
+            )
+
+        seasons = []
+        if (
+            "related" in media_metadata
+            and media_metadata["related"] is not None
+            and "seasons" in media_metadata["related"]
+        ):
+            seasons = media_metadata["related"]["seasons"] or []
+            for season in seasons:
+                season_number = season.get("season_number")
+                season["item_id"] = (
+                    f"{media_type}/{source}/{media_id}/{season_number}"
+                    if season_number is not None
+                    else f"{media_type}/{source}/{media_id}/"
+                )
+                season["parent_id"] = f"{media_type}/{source}/{media_id}"
+
+        return Response(seasons, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/sync/
