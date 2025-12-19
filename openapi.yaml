@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.5
+  version: 0.0.6
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -120,7 +120,7 @@ paths:
           name: media_type
           required: true
           schema:
-            $ref: "#/components/schemas/MediaTypes"
+            $ref: "#/components/schemas/MediaTypesComplete"
         - in: path
           name: history_id
           required: true
@@ -1366,6 +1366,140 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/history/:
+    get:
+      tags:
+        - media
+        - history
+      summary: Get history records for a media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/sync/:
+    post:
+      tags:
+        - media
+      summary: Sync season metadata from provider (non-manual sources). Redirects to the parent season sync.
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "202":
+          description: Sync triggered
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/search/{media_type}/:
     get:
       tags:
@@ -1579,6 +1713,7 @@ components:
                 type: string
                 format: uri
     CompleteMedia:
+    # TODO: missing `media_type` field?
       type: object
       properties:
         media_id:
@@ -1607,27 +1742,27 @@ components:
         score_count:
           type: integer
         details:
-        # TODO: missing tv episode
           oneOf:
-            - $ref: "#/components/schemas/MovieDetails"
-            - $ref: "#/components/schemas/TVDetails"
-            - $ref: "#/components/schemas/SeasonDetails"
             - $ref: "#/components/schemas/AnimeDetails"
-            - $ref: "#/components/schemas/MangaDetails"
-            - $ref: "#/components/schemas/GameDetails"
             - $ref: "#/components/schemas/BookDetails"
             - $ref: "#/components/schemas/ComicDetails"
+            - $ref: "#/components/schemas/EpisodeDetails"
+            - $ref: "#/components/schemas/GameDetails"
+            - $ref: "#/components/schemas/MangaDetails"
+            - $ref: "#/components/schemas/MovieDetails"
+            - $ref: "#/components/schemas/SeasonDetails"
+            - $ref: "#/components/schemas/TVDetails"
         related:
-        # TODO: missing tv episode
           oneOf:
-            - $ref: "#/components/schemas/MovieRelated"
-            - $ref: "#/components/schemas/TVRelated"
-            - $ref: "#/components/schemas/SeasonRelated"
             - $ref: "#/components/schemas/AnimeRelated"
-            - $ref: "#/components/schemas/MangaRelated"
-            - $ref: "#/components/schemas/GameRelated"
             - $ref: "#/components/schemas/BookRelated"
             - $ref: "#/components/schemas/ComicRelated"
+            - $ref: "#/components/schemas/EpisodeRelated"
+            - $ref: "#/components/schemas/GameRelated"
+            - $ref: "#/components/schemas/MangaRelated"
+            - $ref: "#/components/schemas/MovieRelated"
+            - $ref: "#/components/schemas/SeasonRelated"
+            - $ref: "#/components/schemas/TVRelated"
         item_id:
           $ref: "#/components/schemas/ItemId"
         parent_id:
@@ -1781,6 +1916,34 @@ components:
           $ref: "#/components/schemas/ItemId"
         parent_id:
           $ref: "#/components/schemas/ItemId"
+    EpisodeDetails:
+      type: object
+      properties:
+        air_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+          nullable: true
+        episode_number:
+          type: integer
+        season_number:
+          type: integer
+        runtime:
+          type: integer
+          nullable: true
+        episode_type:
+          type: string
+        crew:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrewMember"
+        guest_stars:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuestStar"
+    EpisodeRelated:
+      type: object
+      nullable: true
     ErrorResponse:
       type: object
       properties:

@@ -85,7 +85,7 @@ VALID_SOURCES = {
 
 
 def check_valid_type(media_type, complete=False):
-    """Check the media type is valid."""
+    """Check if the media type is valid."""
     if complete:
         return media_type in MEDIA_TYPE_COMPLETE_VALID_LIST
     return media_type in MEDIA_TYPE_VALID_LIST

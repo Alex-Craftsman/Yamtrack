@@ -154,8 +154,6 @@ class EventSerializer(serializers.ModelSerializer):
 class HistoryEntrySerializer(serializers.Serializer):
     """Serializer for historical records snapshot."""
 
-    # TODO?: is it possible to get the media_id of the history entry related media?
-
     def to_representation(self, instance):
         """Return essential fields from history entry."""
         history_type = getattr(instance, "history_type", None)
@@ -163,6 +161,7 @@ class HistoryEntrySerializer(serializers.Serializer):
 
         return {
             "id": instance.history_id if hasattr(instance, "history_id") else None,
+            "item_id": instance.item_id if hasattr(instance, "item_id") else None,
             "timestamp": instance.history_date
             if hasattr(instance, "history_date")
             else None,

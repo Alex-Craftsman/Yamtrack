@@ -5,6 +5,27 @@ from app.models import MediaTypes
 EXCLUDED_FIELDS = {"id", "item", "user", "related_tv", "related_season"}
 
 
+def build_item_id(item):
+    """Generate item_id string from item object."""
+    if not item:
+        return None
+    media_type = item.media_type
+    children = ""
+
+    if item.media_type == "season" and hasattr(item, "season_number"):
+        children = f"/{item.season_number}"
+        media_type = "tv"
+    elif (
+        item.media_type == "episode"
+        and hasattr(item, "season_number")
+        and hasattr(item, "episode_number")
+    ):
+        children = f"/{item.season_number}/{item.episode_number}"
+        media_type = "tv"
+
+    return f"{media_type}/{item.source}/{item.media_id}{children}"
+
+
 def delete_entry(media_type, history_id, user):
     """Delete a history entry for a given media type and user."""
     historical_model = apps.get_model(
@@ -25,10 +46,19 @@ def get_entry(media_type, history_id, user):
         model_name=f"historical{media_type.lower()}",
     )
 
-    return historical_model.objects.get(
+    record = historical_model.objects.get(
         history_id=history_id,
         history_user=user,
     )
+
+    media_model = apps.get_model("app", media_type)
+    media_instance = media_model.objects.get(id=record.id)
+
+    record.media_id = media_instance.item.media_id
+    record.item_id = build_item_id(media_instance.item)
+    record.media_instance = media_instance
+
+    return record
 
 
 def process_history_entries(history_records, media_type):
