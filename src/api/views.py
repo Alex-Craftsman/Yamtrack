@@ -816,12 +816,14 @@ class MediaSyncView(drf_views.APIView):
 
         ttl = cache.ttl(cache_key)
         if ttl is not None and ttl > (settings.CACHE_TIMEOUT - 3):
-            return Response(
+            response = Response(
                 {
-                    "detail": "Conflict. The data was recently synced, please wait a few seconds.",
+                    "detail": "Too Many Requests. The data was recently synced, please wait a few seconds.",
                 },
-                status=409,
+                status=429,
             )
+            response["Retry-After"] = str(ttl)
+            return response
 
         cache.delete(cache_key)
 
@@ -1142,12 +1144,14 @@ class MediaSeasonSyncView(drf_views.APIView):
 
         ttl = cache.ttl(cache_key)
         if ttl is not None and ttl > (settings.CACHE_TIMEOUT - 3):
-            return Response(
+            response = Response(
                 {
-                    "detail": "Conflict. The data was recently synced, please wait a few seconds.",
+                    "detail": "Too Many Requests. The data was recently synced, please wait a few seconds.",
                 },
-                status=409,
+                status=429,
             )
+            response["Retry-After"] = str(ttl)
+            return response
 
         cache.delete(cache_key)
 
