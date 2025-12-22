@@ -53,7 +53,7 @@ def _build_parent_id(item):
 class ItemSerializer(serializers.ModelSerializer):
     """Serializer used for item details."""
 
-    class Meta:
+    class Meta:  # noqa: D106
         model = Item
         fields = "__all__"
 
@@ -66,7 +66,7 @@ class MediaSerializer(serializers.ModelSerializer):
     parent_id = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta:  # noqa: D106
         model = BasicMedia
         exclude = ("user",)
 
@@ -98,7 +98,7 @@ class EpisodeSerializer(serializers.Serializer):
     end_date = serializers.SerializerMethodField()
     notes = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta:  # noqa: D106
         model = BasicMedia
         fields = "__all__"
 
@@ -112,6 +112,7 @@ class EpisodeSerializer(serializers.Serializer):
         return getattr(obj, "score", None)
 
     def get_progress(self, obj):
+        """Return progress or default to 1."""
         return getattr(obj, "progress", None) or 1
 
     def get_status(self, obj):
@@ -124,6 +125,7 @@ class EpisodeSerializer(serializers.Serializer):
         return getattr(obj, "end_date", None)
 
     def get_notes(self, obj):
+        """Return notes or default to empty string."""
         return getattr(obj, "notes", "") or ""
 
     def get_item_id(self, obj):
@@ -140,7 +142,7 @@ class EventSerializer(serializers.ModelSerializer):
     item_id = serializers.SerializerMethodField()
     parent_id = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta:  # noqa: D106
         model = Event
         fields = "__all__"
 
@@ -152,7 +154,7 @@ class EventSerializer(serializers.ModelSerializer):
 
 
 class HistoryEntrySerializer(serializers.Serializer):
-    """Serializer for historical records snapshot."""
+    """Serializer that builds a change-based history entry."""
 
     def to_representation(self, instance):
         """Return essential fields from history entry."""
@@ -192,7 +194,7 @@ class TimelineItemSerializer(serializers.ModelSerializer):
     media_type = serializers.SerializerMethodField()
     source = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta:  # noqa: D106
         model = BasicMedia
         exclude = ("user",)
 
