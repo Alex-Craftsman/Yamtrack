@@ -23,6 +23,19 @@ from .serializers import EpisodeSerializer, EventSerializer, MediaSerializer
 
 logger = logging.getLogger(__name__)
 
+HTTP_STATUS_MAP = {
+    200: "OK.",
+    201: "Created.",
+    202: "Accepted.",
+    204: "No content.",
+    400: "Bad request.",
+    401: "Unauthorized.",
+    403: "Permission denied.",
+    404: "Not found.",
+    405: "Method not allowed.",
+    500: "Internal server error.",
+    501: "Not implemented.",
+}
 
 MEDIA_TYPE_COMPLETE_MODEL_MAP = {
     MediaTypes.TV.value: TV,
@@ -96,6 +109,11 @@ def check_source_type(media_type, source):
     if media_type in VALID_SOURCES:
         return source in VALID_SOURCES[media_type]
     return False
+
+
+def get_http_message(status):
+    """Return the standard HTTP status message for the given status code."""
+    return HTTP_STATUS_MAP.get(status, "Unknown status.")
 
 
 def get_media_status(status):
