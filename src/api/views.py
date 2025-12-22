@@ -52,11 +52,12 @@ from .serializers import HistoryEntrySerializer, MediaSerializer, TimelineItemSe
 
 # /api/v1/calendar/
 class CalendarView(drf_views.APIView):
-    """Retrieve calendar events for the authenticated user."""
+    """Calendar view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        """Retrieve calendar events for the authenticated user."""
         start_date = request.GET.get("start_date")
         end_date = request.GET.get("end_date")
         month_q = request.GET.get("month")
@@ -127,18 +128,19 @@ class CalendarView(drf_views.APIView):
 
 # /api/v1/calendar/update/
 class UpdateCalendarView(drf_views.APIView):
-    """Trigger calendar events update for the authenticated user."""
+    """Update calendar view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        """Trigger calendar events update for the authenticated user."""
         tasks.reload_calendar.delay(request.user)
         return Response({"detail": "Accepted. Task queued"}, status=202)
 
 
 # /api/v1/history/[media_type]/[history_id]
 class MediaTypeHistoryDetailView(drf_views.APIView):
-    """Operations on a specific history entry for a given media type."""
+    """History record view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
@@ -213,12 +215,13 @@ class ListRemoveItemView(drf_views.APIView):
 
 # /api/v1/media/
 class MediaListView(drf_views.APIView):
-    """Retrieve the list of media for the authenticated user."""
+    """List media view."""
 
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        """Retrieve the list of media for the authenticated user."""
         # TODO: check progress sort might not be working
         user = request.user
         media_type = request.GET.get("media_type")
@@ -311,12 +314,13 @@ class MediaListView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/
 class MediaTypeListView(drf_views.APIView):
-    """Retrieve the list of media for the authenticated user for a specific media type."""
+    """List media by type view."""
 
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type):
+        """Retrieve the list of media of a specific media type."""
         user = request.user
         status = request.GET.get("status", "")
         search = request.GET.get("search", "")
@@ -504,7 +508,7 @@ class MediaTypeListView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/
 class MediaDetailView(drf_views.APIView):
-    """Operations on a specific media for the authenticated user."""
+    """Media view."""
 
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -632,12 +636,13 @@ class MediaDetailView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/recommendations/
 class MediaRecommendationsView(drf_views.APIView):
-    """Retrieve recommendations for a specific media."""
+    """Media recommendations view."""
 
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, media_type, source, media_id):
+    def get(self, _, media_type, source, media_id):
+        """Retrieve recommendations for a specific media."""
         if not check_valid_type(media_type):
             return Response(
                 {"detail": "Bad Request. Unsupported media type."},
@@ -673,7 +678,7 @@ class MediaRecommendationsView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/history/
 class MediaHistoryView(drf_views.APIView):
-    """Retrieve the history timeline for a specific media."""
+    """Media history view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
@@ -720,16 +725,17 @@ class MediaHistoryView(drf_views.APIView):
             offset,
             "history",
         )
-        return Response(paginated_data)
+        return Response(paginated_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/seasons/
 class MediaSeasonsView(drf_views.APIView):
-    """Retrieve the history timeline for a specific media."""
+    """Media seasons view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id):
+        """Retrieve the history timeline for a specific media."""
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
@@ -786,11 +792,11 @@ class MediaSeasonsView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/sync/
 class MediaSyncView(drf_views.APIView):
-    """Sync metadata from provider for a specific media (refresh cache and update item/episodes)."""
+    """Sync media view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, media_type, source, media_id):
+    def post(self, _, media_type, source, media_id):
         """Trigger sync of metadata from provider (non-manual sources only)."""
         if not check_valid_type(media_type):
             return Response(
@@ -869,7 +875,7 @@ class MediaAddToListView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/
 class MediaSeasonDetailView(drf_views.APIView):
-    """Operations on a specific season of a tv serie for the authenticated user."""
+    """Season view."""
 
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -984,11 +990,12 @@ class MediaSeasonDetailView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/episodes/
 class MediaSeasonEpisodesView(drf_views.APIView):
-    """Retrieve the episodes for a specific season of a tv serie."""
+    """Season episodes view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id, season_number):
+        """Retrieve the episodes for a specific season of a tv serie."""
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
@@ -1045,7 +1052,7 @@ class MediaSeasonEpisodesView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/
 class MediaSeasonHistoryView(drf_views.APIView):
-    """Retrieve the history timeline for a specific season of a tv serie."""
+    """History season view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1101,16 +1108,16 @@ class MediaSeasonHistoryView(drf_views.APIView):
             offset,
             "history",
         )
-        return Response(paginated_data)
+        return Response(paginated_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/sync/
 class MediaSeasonSyncView(drf_views.APIView):
-    """Sync metadata from provider for a specific season of a tv serie."""
+    """Sync season."""
 
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, media_type, source, media_id, season_number):
+    def post(self, _, media_type, source, media_id, season_number):
         """Trigger sync of metadata from provider (non-manual sources only)."""
         if not check_valid_type(media_type):
             return Response(
@@ -1221,7 +1228,7 @@ class MediaSeasonSyncView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/
 class MediaEpisodeDetailView(drf_views.APIView):
-    """Operations on a specific episode of a tv serie for the authenticated user."""
+    """Episode view."""
 
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -1389,11 +1396,12 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/
 class MediaEpisodeHistoryView(drf_views.APIView):
-    """Retrieve history timeline entries for a specific episode of a tv serie."""
+    """History episode view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id, season_number, episode_number):
+        """Retrieve history timeline entries for a specific episode of a tv serie."""
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
@@ -1445,12 +1453,12 @@ class MediaEpisodeHistoryView(drf_views.APIView):
             offset,
             "history",
         )
-        return Response(paginated_data)
+        return Response(paginated_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/sync/
 class MediaEpisodeSyncView(drf_views.APIView):
-    """Sync metadata from provider for a specific episode of a tv serie."""
+    """Sync episode view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1461,7 +1469,7 @@ class MediaEpisodeSyncView(drf_views.APIView):
         source,
         media_id,
         season_number,
-        episode_number,
+        _,
     ):
         """Redirect episode sync to season sync."""
         season_sync = MediaSeasonSyncView()
@@ -1476,12 +1484,13 @@ class MediaEpisodeSyncView(drf_views.APIView):
 
 # /api/v1/search/[media_type]/
 class SearchProviderView(drf_views.APIView):
-    """Search for media using the specified provider."""
+    """Search view."""
 
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type):
+        """Search for media using the specified provider."""
         search = request.GET.get("search", "")
         source = request.GET.get("source", None)
         limit, offset, err = parse_limit_offset(request)
@@ -1565,16 +1574,17 @@ class SearchProviderView(drf_views.APIView):
             "results": sliced,
         }
 
-        return Response(payload)
+        return Response(payload, status=200)
 
 
 # /api/v1/statistics/
 class StatisticsView(drf_views.APIView):
-    """Retrieve statistics for the authenticated user."""
+    """Statistics view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        """Retrieve statistics for the authenticated user."""
         # TODO: Possibly don't use WebUI needed statistics but compute them for API
         timeformat = "%Y-%m-%d"
         today = timezone.localdate()
