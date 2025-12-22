@@ -1,11 +1,10 @@
-from datetime import date, timedelta
+from calendar import monthrange
+from datetime import date
 
 from django.conf import settings
 from django.core.cache import cache
 from django.db import IntegrityError
-from django.utils import timezone
-from django.utils.dateparse import parse_date
-from django.utils.timezone import datetime
+from django.utils.timezone import datetime, localdate, make_aware
 from rest_framework import permissions
 from rest_framework import views as drf_views
 from rest_framework.response import Response
@@ -27,23 +26,22 @@ from events.models import Event
 from users.models import MediaStatusChoices
 
 from .helpers import (
-    EPISODES_ADDITIONAL_SORTS,
-    EXISTING_SORTS,
     MANUAL_SORTS,
     MEDIA_TYPE_COMPLETE_MODEL_MAP,
     MEDIA_TYPE_VALID_LIST,
-    SEASONS_ADDITIONAL_SORTS,
     apply_aggregated_sort,
     apply_manual_sort_for_type,
     check_source_type,
     check_valid_type,
     fetch_media_list,
+    get_complete_sorts,
     get_http_message,
     get_media_status,
     make_page_url,
     paginate_data,
     parse_limit_offset,
     parse_sort_filter,
+    try_parse_date,
 )
 from .history_processor import delete_entry, get_entry, process_history_entries
 from .serializers import HistoryEntrySerializer, MediaSerializer, TimelineItemSerializer
@@ -270,11 +268,7 @@ class MediaListView(drf_views.APIView):
                     status=400,
                 )
 
-            sort_list = EXISTING_SORTS
-            if media_type == "season":
-                sort_list += SEASONS_ADDITIONAL_SORTS
-            elif media_type == "episode":
-                sort_list += EPISODES_ADDITIONAL_SORTS
+            sort_list = get_complete_sorts(media_type)
 
             if sort in sort_list:
                 media_sort = sort
@@ -307,7 +301,7 @@ class MediaListView(drf_views.APIView):
                 results.extend(fetch_media_list(user, t, status, "", search))
 
             if sort != "":
-                sort_list = EXISTING_SORTS + MANUAL_SORTS
+                sort_list = get_complete_sorts(None)
                 if sort in sort_list:
                     results = apply_aggregated_sort(results, sort)
                     if isinstance(results, Response):
@@ -363,11 +357,7 @@ class MediaTypeListView(drf_views.APIView):
                 status=400,
             )
 
-        sort_list = EXISTING_SORTS
-        if media_type == "season":
-            sort_list += SEASONS_ADDITIONAL_SORTS
-        elif media_type == "episode":
-            sort_list += EPISODES_ADDITIONAL_SORTS
+        sort_list = get_complete_sorts(media_type)
 
         if sort in sort_list:
             media_sort = sort
@@ -547,7 +537,7 @@ class MediaDetailView(drf_views.APIView):
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": f"Bad Request. Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
                 },
                 status=400,
             )
@@ -1610,7 +1600,7 @@ class StatisticsView(drf_views.APIView):
         """Retrieve statistics for the authenticated user."""
         # TODO: Possibly don't use WebUI needed statistics but compute them for API
         timeformat = "%Y-%m-%d"
-        today = timezone.localdate()
+        today = localdate()
         one_year_ago = today.replace(year=today.year - 1).strftime(timeformat)
         today = today.strftime(timeformat)
 
@@ -1626,10 +1616,10 @@ class StatisticsView(drf_views.APIView):
             end_date = parse_date(end_date)
 
             if start_date and end_date:
-                start_date = timezone.make_aware(
+                start_date = make_aware(
                     datetime.combine(start_date, datetime.min.time()),
                 )
-                end_date = timezone.make_aware(
+                end_date = make_aware(
                     datetime.combine(end_date, datetime.max.time()),
                 )
         user_media, media_count = get_user_media(
