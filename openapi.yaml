@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.7
+  version: 0.0.8
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -1383,7 +1383,7 @@ paths:
       tags:
         - media
         - history
-      summary: Get history records for a media item
+      summary: Get history records for an episode
       parameters:
         - in: path
           name: media_type
@@ -2361,6 +2361,7 @@ components:
           title:
             type: string
     SearchItem:
+    # TODO: add item_id and tracked field for already tracked items
       type: object
       properties:
         media_id:
