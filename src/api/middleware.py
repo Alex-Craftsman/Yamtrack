@@ -4,6 +4,8 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.template.response import ContentNotRenderedError, TemplateResponse
 
+from .helpers import get_http_message
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,65 +17,79 @@ class ApiJsonErrorMiddleware:
 
     def __call__(self, request):  # noqa: D102
         response = self.get_response(request)
-
-        try:
-            path = request.path or ""
-        except Exception:
-            path = ""
+        path = self._get_request_path(request)
 
         if path.startswith("/api/") and response is not None:
+            response = self._handle_template_response(response, path)
             status = getattr(response, "status_code", 200)
+            content_type = self._get_content_type(response)
 
-            if isinstance(response, TemplateResponse):
-                try:
-                    response = response.render()
-                except ContentNotRenderedError:
-                    logger.exception(
-                        "TemplateResponse could not be rendered for %s", path
-                    )
-                except Exception:
-                    logger.exception(
-                        "Error while rendering TemplateResponse for %s", path
-                    )
-
-            if hasattr(response, "headers"):
-                content_type = response.headers.get("Content-Type", "")
-            elif hasattr(response, "get"):
-                try:
-                    content_type = response.get("Content-Type", "")
-                except Exception:
-                    content_type = getattr(response, "content_type", "")
-            else:
-                content_type = getattr(response, "content_type", "")
-
-            if status >= 400 and (not content_type or "html" in content_type.lower()):
-                if content_type and "application/json" in content_type:
-                    return response
-
-                default_messages = {
-                    400: "Bad request.",
-                    401: "Unauthorized.",
-                    403: "Permission denied.",
-                    404: "Not found.",
-                    405: "Method not allowed.",
-                    500: "Internal server error.",
-                }
-
-                message = default_messages.get(status, "Error")
-                if settings.DEBUG and hasattr(response, "content"):
-                    try:
-                        detail = response.content.decode(errors="ignore")
-                    except Exception:
-                        detail = None
-                    payload = {"detail": message}
-                    if detail:
-                        payload["debug_html_snippet"] = detail[:2000]
-                else:
-                    payload = {"detail": message}
-
-                return JsonResponse(payload, status=status)
+            if self._should_convert_to_json(status, content_type):
+                return self._build_json_error_response(response, status)
 
         return response
+
+    def _get_request_path(self, request):
+        """Safely extract the request path."""
+        try:
+            return request.path or ""
+        except Exception:
+            return ""
+
+    def _handle_template_response(self, response, path):
+        """Render TemplateResponse if needed."""
+        if isinstance(response, TemplateResponse):
+            try:
+                response = response.render()
+            except ContentNotRenderedError:
+                logger.exception(
+                    "TemplateResponse could not be rendered for %s",
+                    path,
+                )
+            except Exception:
+                logger.exception(
+                    "Error while rendering TemplateResponse for %s",
+                    path,
+                )
+        return response
+
+    def _get_content_type(self, response):
+        """Extract content type from response."""
+        if hasattr(response, "headers"):
+            return response.headers.get("Content-Type", "")
+
+        if hasattr(response, "get"):
+            try:
+                return response.get("Content-Type", "")
+            except Exception:
+                return getattr(response, "content_type", "")
+
+        return getattr(response, "content_type", "")
+
+    def _should_convert_to_json(self, status, content_type):
+        """Determine if response should be converted to JSON."""
+        if content_type and "application/json" in content_type:
+            return False
+        return status >= 400 and (not content_type or "html" in content_type.lower())
+
+    def _build_json_error_response(self, response, status):
+        """Build JSON error response."""
+        message = get_http_message(status)
+        payload = {"detail": message}
+
+        if settings.DEBUG and hasattr(response, "content"):
+            detail = self._extract_debug_detail(response)
+            if detail:
+                payload["debug_html_snippet"] = detail[:2000]
+
+        return JsonResponse(payload, status=status)
+
+    def _extract_debug_detail(self, response):
+        """Extract debug detail from response content."""
+        try:
+            return response.content.decode(errors="ignore")
+        except Exception:
+            return None
 
     def process_exception(self, request, exception):
         """Intercept unhandled exceptions for API paths and return JSON.
@@ -81,10 +97,7 @@ class ApiJsonErrorMiddleware:
         This prevents Django from rendering the HTML technical 500 page
         (when DEBUG=True) for API calls.
         """
-        try:
-            path = request.path or ""
-        except Exception:
-            path = ""
+        path = self._get_request_path(request)
 
         if not path.startswith("/api/"):
             return None
