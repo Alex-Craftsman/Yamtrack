@@ -26,27 +26,44 @@ from events.models import Event
 from users.models import MediaStatusChoices
 
 from .helpers import (
-    MANUAL_SORTS,
     MEDIA_TYPE_COMPLETE_MODEL_MAP,
-    MEDIA_TYPE_VALID_LIST,
-    apply_aggregated_sort,
-    apply_manual_sort_for_type,
     check_source_type,
     check_valid_type,
-    fetch_media_list,
-    get_complete_sorts,
+    fetch_results_all_types,
+    fetch_results_for_type,
     get_http_message,
     get_media_status,
     make_page_url,
     paginate_data,
+    parse_excluded_items,
     parse_limit_offset,
     parse_sort_filter,
+    parse_status_param,
     try_parse_date,
 )
-from .history_processor import delete_entry, get_entry, process_history_entries
-from .serializers import HistoryEntrySerializer, MediaSerializer, TimelineItemSerializer
+from .history_processor import (
+    delete_history_entry,
+    get_history_entries,
+    get_history_entry,
+)
+from .serializers import (
+    CompleteEpisodeSerializer,
+    CompleteMediaSerializer,
+    EpisodeSerializer,
+    HistoryEntrySerializer,
+    MediaSerializer,
+    SeasonSerializer,
+    TimelineItemSerializer,
+    serialize_data,
+)
 
-# TODO!!!: Deduplicate helper code in helpers.py and history_processor.py
+# TODO!: check sorters and filters in paginate_data since data is not serialized yet.
+
+# TODO!: for children items, it should return an error if user is trying to access a non existing season/episode (for example if it's requested the season 4 of a 2 season show)
+
+# TODO: Implement search for already tracked media (item_id and tracked fields)
+
+# TODO: Implement global search endpoint for every media_type
 
 
 # /api/v1/calendar/
@@ -66,51 +83,38 @@ class CalendarView(drf_views.APIView):
         if err:
             return err
 
-        if start_date:
-            if end_date:
-                try:
-                    start_date_parsed = parse_date(start_date)
-                    end_date_parsed = parse_date(end_date)
-                    if not start_date_parsed or not end_date_parsed:
-                        raise ValueError("Invalid date format")
-                    first_day = start_date_parsed
-                    last_day = end_date_parsed
-                except (TypeError, ValueError):
-                    return Response(
-                        {"detail": f"{get_http_message(400)} Invalid date format."},
-                        status=400,
-                    )
+        try:
+            if start_date:
+                first_day = try_parse_date(start_date)
+                last_day = try_parse_date(end_date) if end_date else localdate()
             else:
                 try:
-                    start_date_parsed = parse_date(start_date)
-                    if not start_date_parsed:
-                        raise ValueError("Invalid date format")
-                    first_day = start_date_parsed
-                    last_day = timezone.localdate()
+                    if year_q:
+                        year = int(year_q)
+                        if month_q:
+                            month = int(month_q)
+                            first_day = date(year, month, 1)
+                            last_day = date(year, month, monthrange(year, month)[1])
+                        else:
+                            first_day = date(year, 1, 1)
+                            last_day = date(year, 12, 31)
+                    else:
+                        current = localdate()
+                        year = current.year
+                        month = current.month
+                        first_day = date(year, month, 1)
+                        last_day = date(year, month, monthrange(year, month)[1])
                 except (TypeError, ValueError):
-                    return Response(
-                        {"detail": f"{get_http_message(400)} Invalid date format."},
-                        status=400,
-                    )
-        else:
-            try:
-                if month_q and year_q:
-                    current = date(int(year_q), int(month_q), 1)
-                else:
-                    current = timezone.localdate()
-            except (TypeError, ValueError):
-                current = timezone.localdate()
-
-            month = current.month
-            year = current.year
-
-            is_december = month == 12
-
-            first_day = date(year, month, 1)
-            if is_december:
-                last_day = date(year, 12, 31)
-            else:
-                last_day = date(year, month + 1, 1) - timedelta(days=1)
+                    current = localdate()
+                    year = current.year
+                    month = current.month
+                    first_day = date(year, month, 1)
+                    last_day = date(year, month, monthrange(year, month)[1])
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": f"{get_http_message(400)} Invalid date format."},
+                status=400,
+            )
 
         try:
             releases = Event.objects.get_user_events(request.user, first_day, last_day)
@@ -120,7 +124,12 @@ class CalendarView(drf_views.APIView):
                 status=500,
             )
 
-        paginated_data = paginate_data(request, releases, limit, offset, "events")
+        paginated_data = paginate_data(request, releases, limit, offset)
+        paginated_data["results"] = serialize_data(
+            paginated_data["results"],
+            many=True,
+            context={"request": request},
+        )
 
         return Response(paginated_data)
 
@@ -155,9 +164,13 @@ class MediaTypeHistoryDetailView(drf_views.APIView):
             )
 
         try:
-            history_entry = get_entry(media_type, history_id, request.user)
-            serialized = HistoryEntrySerializer(history_entry)
-            return Response(serialized.data, status=200)
+            record = get_history_entry(media_type, history_id, request.user)
+            serialized_data = serialize_data(
+                record,
+                context={"media_type": media_type},
+                serializer_class=HistoryEntrySerializer,
+            )
+            return Response(serialized_data, status=200)
         except Exception as e:
             return Response(
                 {
@@ -176,7 +189,7 @@ class MediaTypeHistoryDetailView(drf_views.APIView):
             )
 
         try:
-            delete_entry(media_type, history_id, request.user)
+            delete_history_entry(media_type, history_id, request.user)
             return Response({"detail": "Record removed correctly"}, status=204)
         except Exception as e:
             return Response(
@@ -236,30 +249,20 @@ class MediaListView(drf_views.APIView):
         status = request.GET.get("status", "")
         search = request.GET.get("search", "")
         sort_filter = request.GET.get("sort", "")
-        exclude = (
-            request.GET.get("exclude", "").split(",")
-            if request.GET.get("exclude")
-            else []
-        )
+        exclude = parse_excluded_items(request)
 
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
 
-        if not status:
-            status = MediaStatusChoices.ALL
-        else:
-            try:
-                status = get_media_status(int(status))
-            except (TypeError, ValueError):
-                return Response(
-                    {"detail": f"{get_http_message(404)} Invalid status"},
-                    status=404,
-                )
+        status = parse_status_param(status)
+        if status is None:
+            return Response(
+                {"detail": f"{get_http_message(404)} Invalid status"},
+                status=404,
+            )
 
-        results = []
         sort, sort_order = parse_sort_filter(sort_filter)
-        already_sorted = False
 
         if media_type:
             if not check_valid_type(media_type, complete=True):
@@ -267,56 +270,46 @@ class MediaListView(drf_views.APIView):
                     {"detail": f"{get_http_message(400)} Unsupported media type."},
                     status=400,
                 )
-
-            sort_list = get_complete_sorts(media_type)
-
-            if sort in sort_list:
-                media_sort = sort
-                already_sorted = True
-            else:
-                media_sort = ""
-
-            results.extend(
-                fetch_media_list(user, media_type, status, media_sort, search),
+            results, has_error = fetch_results_for_type(
+                user,
+                media_type,
+                status,
+                sort,
+                search,
             )
-
-            if not already_sorted and sort != "":
-                if sort in MANUAL_SORTS:
-                    results = apply_manual_sort_for_type(results, sort)
-                    if isinstance(results, Response):
-                        return results
-                else:
-                    return Response(
-                        {"detail": f"{get_http_message(404)} Invalid sorting"},
-                        status=404,
-                    )
-
         else:
             # Exclude EPISODES and SEASONS from results by default
             # to declutter the results
-            excluded_set = {e.strip().lower() for e in exclude if e and e.strip()}
-            allowed_types = [t for t in MEDIA_TYPE_VALID_LIST if t not in excluded_set]
+            # TODO: Add an option to return those too? (seasons=true&episodes=false)
+            results, has_error = fetch_results_all_types(
+                user,
+                status,
+                sort,
+                search,
+                exclude,
+            )
 
-            for t in allowed_types:
-                results.extend(fetch_media_list(user, t, status, "", search))
+        if has_error:
+            return Response(
+                {"detail": f"{get_http_message(404)} Invalid sorting"},
+                status=404,
+            )
 
-            if sort != "":
-                sort_list = get_complete_sorts(None)
-                if sort in sort_list:
-                    results = apply_aggregated_sort(results, sort)
-                    if isinstance(results, Response):
-                        return results
-                else:
-                    return Response(
-                        {"detail": f"{get_http_message(404)} Invalid sorting"},
-                        status=404,
-                    )
+        if isinstance(results, Response):
+            return results
 
         if sort_order == "desc":
             results.reverse()
 
-        paginated_data = paginate_data(request, results, limit, offset, "media")
-        return Response(paginated_data)
+        paginated_data = paginate_data(request, results, limit, offset)
+        serialized_data = serialize_data(
+            paginated_data["results"],
+            context={"request": request},
+            many=True,
+            homogeneus=False,
+        )
+        paginated_data["results"] = serialized_data
+        return Response(paginated_data, status=200)
 
 
 # /api/v1/media/[media_type]/
@@ -336,53 +329,48 @@ class MediaTypeListView(drf_views.APIView):
         if err:
             return err
 
-        if not status:
-            status = MediaStatusChoices.ALL
-        else:
-            try:
-                status = get_media_status(int(status))
-            except (TypeError, ValueError):
-                return Response(
-                    {"detail": f"{get_http_message(404)} Invalid status"},
-                    status=404,
-                )
+        status = parse_status_param(status)
+        if status is None:
+            return Response(
+                {"detail": f"{get_http_message(404)} Invalid status"},
+                status=404,
+            )
 
-        results = []
         sort, sort_order = parse_sort_filter(sort_filter)
-        already_sorted = False
 
         if not check_valid_type(media_type, complete=True):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
                 status=400,
             )
+        results, has_error = fetch_results_for_type(
+            user,
+            media_type,
+            status,
+            sort,
+            search,
+        )
 
-        sort_list = get_complete_sorts(media_type)
+        if has_error:
+            return Response(
+                {"detail": f"{get_http_message(404)} Invalid sorting"},
+                status=404,
+            )
 
-        if sort in sort_list:
-            media_sort = sort
-            already_sorted = True
-        else:
-            media_sort = ""
-
-        results = fetch_media_list(user, media_type, status, media_sort, search)
-
-        if not already_sorted and sort != "":
-            if sort in MANUAL_SORTS:
-                results = apply_manual_sort_for_type(results, sort)
-                if isinstance(results, Response):
-                    return results
-            else:
-                return Response(
-                    {"detail": f"{get_http_message(404)} Invalid sorting"},
-                    status=404,
-                )
+        if isinstance(results, Response):
+            return results
 
         if sort_order == "desc":
             results.reverse()
 
-        paginated_data = paginate_data(request, results, limit, offset, "media")
-        return Response(paginated_data)
+        paginated_data = paginate_data(request, results, limit, offset)
+        serialized_data = serialize_data(
+            paginated_data["results"],
+            context={"request": request},
+            many=True,
+        )
+        paginated_data["results"] = serialized_data
+        return Response(paginated_data, status=200)
 
     def post(self, request, media_type):  # noqa: C901, D102, PLR0911, PLR0912
         return Response({"detail": f"{get_http_message(501)}"}, status=501)
@@ -450,8 +438,8 @@ class MediaTypeListView(drf_views.APIView):
                 )
 
             media_form.save()
-            serializer = MediaSerializer(media_form.instance)
-            return Response(serializer.data, status=201)
+            serialized_data = serialize_data(media_form.instance)
+            return Response(serialized_data, status=201)
 
         media_id = body.get("media_id")
         if not media_id:
@@ -513,8 +501,8 @@ class MediaTypeListView(drf_views.APIView):
             )
 
         media_form.save()
-        serializer = MediaSerializer(media_form.instance)
-        return Response(serializer.data, status=201)
+        serialized_data = serialize_data(media_form.instance)
+        return Response(serialized_data, status=201)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/
@@ -544,21 +532,11 @@ class MediaDetailView(drf_views.APIView):
 
         try:
             media_metadata = services.get_media_metadata(media_type, media_id, source)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": f"{get_http_message(500)}", "errors": str(e)},
                 status=500,
             )
-
-        tracked = False
-        created = ""
-        score = ""
-        progress = ""
-        progressed_at = ""
-        status = ""
-        start_date = ""
-        end_date = ""
-        notes = ""
 
         try:
             user_medias = BasicMedia.objects.filter_media_prefetch(
@@ -567,11 +545,14 @@ class MediaDetailView(drf_views.APIView):
                 media_type,
                 source,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": "Internal Server Error", "errors": str(e)},
                 status=500,
             )
+
+        # TODO: This gets only the first media consumption, but the API needs to manage/display every consumption
+        user_media = user_medias[0] if user_medias else None
 
         if (
             "related" in media_metadata
@@ -580,63 +561,16 @@ class MediaDetailView(drf_views.APIView):
         ):
             media_metadata["related"].pop("recommendations")
 
-        if (
-            media_type == MediaTypes.TV.value
-            and "related" in media_metadata
-            and media_metadata["related"] is not None
-            and "seasons" in media_metadata["related"]
-            and media_metadata["related"]["seasons"] is not None
-        ):
-            for season in media_metadata["related"]["seasons"]:
-                season["item_id"] = (
-                    f"{media_type}/{source}/{media_id}/{season.get('season_number')}"
-                )
-                season["parent_id"] = f"{media_type}/{source}/{media_id}"
+        data = {
+            "media_metadata": media_metadata,
+            "user_media": user_media,
+        }
 
-        if user_medias:
-            serialized = MediaSerializer(user_medias[0]).data
-            tracked = True
-            created = serialized["created_at"]
-            score = serialized["score"]
-            progress = serialized["progress"]
-            progressed_at = serialized["progressed_at"]
-            status = serialized["status"]
-            start_date = serialized["start_date"]
-            end_date = serialized["end_date"]
-            notes = serialized["notes"]
-
-        media_metadata["item_id"] = f"{media_type}/{source}/{media_id}"
-        media_metadata["parent_id"] = None
-        media_metadata["tracked"] = tracked
-        media_metadata["user_created"] = created
-        media_metadata["user_score"] = score
-        media_metadata["user_progress"] = progress
-        media_metadata["user_progressed_at"] = progressed_at
-        media_metadata["user_status"] = status
-        media_metadata["user_start_date"] = start_date
-        media_metadata["user_end_date"] = end_date
-        media_metadata["user_notes"] = notes
-
-        if media_type == MediaTypes.TV.value:
-            details = media_metadata.get("details", {})
-            if "tvdb_id" in media_metadata:
-                details["tvdb_id"] = media_metadata.pop("tvdb_id")
-            if "last_episode_season" in media_metadata:
-                details["last_episode_season"] = media_metadata.pop(
-                    "last_episode_season",
-                )
-            if "next_episode_season" in media_metadata:
-                details["next_episode_season"] = media_metadata.pop(
-                    "next_episode_season",
-                )
-            media_metadata["details"] = details
-        elif media_type == MediaTypes.COMIC.value:
-            details = media_metadata.get("details", {})
-            if "last_issue_id" in media_metadata:
-                details["last_issue_id"] = media_metadata.pop("last_issue_id")
-            media_metadata["details"] = details
-
-        return Response(media_metadata, status=200)
+        serialized = serialize_data(
+            data,
+            serializer_class=CompleteMediaSerializer,
+        )
+        return Response(serialized, status=200)
 
     def patch(self, request, media_type, source, media_id):  # noqa: ARG002, D102
         return Response({"detail": f"{get_http_message(501)}"}, status=501)
@@ -670,7 +604,7 @@ class MediaRecommendationsView(drf_views.APIView):
 
         try:
             media_metadata = services.get_media_metadata(media_type, media_id, source)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": f"{get_http_message(500)}", "errors": str(e)},
                 status=500,
@@ -720,21 +654,19 @@ class MediaHistoryView(drf_views.APIView):
             source,
         )
 
-        timeline_entries = []
-        if user_medias.exists():
-            timeline_entries = [
-                entry
-                for media in user_medias
-                if (history := media.history.all())
-                for entry in process_history_entries(history, media_type)
-            ]
+        entries = get_history_entries(user_medias, media_type)
 
         paginated_data = paginate_data(
             request,
-            timeline_entries,
+            entries,
             limit,
             offset,
-            "history",
+        )
+        paginated_data["results"] = serialize_data(
+            paginated_data["results"],
+            many=True,
+            context={"media_type": media_type},
+            serializer_class=HistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
 
@@ -751,7 +683,7 @@ class MediaSeasonsView(drf_views.APIView):
         if err:
             return err
 
-        if not check_valid_type(media_type):
+        if not check_valid_type(media_type) or media_type != MediaTypes.TV.value:
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
                 status=400,
@@ -775,7 +707,7 @@ class MediaSeasonsView(drf_views.APIView):
 
         try:
             media_metadata = services.get_media_metadata(media_type, media_id, source)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": f"{get_http_message(500)}", "errors": str(e)},
                 status=500,
@@ -787,18 +719,15 @@ class MediaSeasonsView(drf_views.APIView):
             and media_metadata["related"] is not None
             and "seasons" in media_metadata["related"]
         ):
-            seasons = media_metadata["related"]["seasons"] or []
-            for season in seasons:
-                season_number = season.get("season_number")
-                season["item_id"] = (
-                    f"{media_type}/{source}/{media_id}/{season_number}"
-                    if season_number is not None
-                    else f"{media_type}/{source}/{media_id}/"
-                )
-                season["parent_id"] = f"{media_type}/{source}/{media_id}"
+            seasons = media_metadata["related"]["seasons"]
 
-        paginated = paginate_data(request, seasons, limit, offset, "seasons")
-        return Response(paginated, status=200)
+        paginated_data = paginate_data(request, seasons, limit, offset)
+        paginated_data["results"] = serialize_data(
+            paginated_data["results"],
+            many=True,
+            serializer_class=SeasonSerializer,
+        )
+        return Response(paginated_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/sync/
@@ -936,16 +865,6 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=404,
             )
 
-        tracked = False
-        created = ""
-        score = ""
-        progress = ""
-        progressed_at = ""
-        status = ""
-        start_date = ""
-        end_date = ""
-        notes = ""
-
         try:
             user_medias = BasicMedia.objects.filter_media_prefetch(
                 user,
@@ -960,43 +879,19 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=500,
             )
 
-        episodes = []
-        if "episodes" in media_metadata and media_metadata["episodes"] is not None:
-            episodes = media_metadata.pop("episodes")
-            for episode in episodes:
-                episode["item_id"] = (
-                    f"{media_type}/{source}/{media_id}/{season_number}/{episode.get('episode_number')}"
-                )
-                episode["parent_id"] = (
-                    f"{media_type}/{source}/{media_id}/{season_number}"
-                )
+        # TODO: This gets only the first media consumption, but the API needs to manage/display every consumption
+        user_media = user_medias[0] if user_medias else None
 
-        if user_medias:
-            serialized = MediaSerializer(user_medias[0]).data
-            tracked = True
-            created = serialized["created_at"]
-            score = serialized["score"]
-            progress = serialized["progress"]
-            progressed_at = serialized["progressed_at"]
-            status = serialized["status"]
-            start_date = serialized["start_date"]
-            end_date = serialized["end_date"]
-            notes = serialized["notes"]
+        data = {
+            "media_metadata": media_metadata,
+            "user_media": user_media,
+        }
 
-        media_metadata["related"] = {"episodes": episodes}
-        media_metadata["item_id"] = f"{media_type}/{source}/{media_id}/{season_number}"
-        media_metadata["parent_id"] = f"{media_type}/{source}/{media_id}"
-        media_metadata["tracked"] = tracked
-        media_metadata["user_created"] = created
-        media_metadata["user_score"] = score
-        media_metadata["user_progress"] = progress
-        media_metadata["user_progressed_at"] = progressed_at
-        media_metadata["user_status"] = status
-        media_metadata["user_start_date"] = start_date
-        media_metadata["user_end_date"] = end_date
-        media_metadata["user_notes"] = notes
-
-        return Response(media_metadata, status=200)
+        serialized = serialize_data(
+            data,
+            serializer_class=CompleteMediaSerializer,
+        )
+        return Response(serialized, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/episodes/
@@ -1048,16 +943,15 @@ class MediaSeasonEpisodesView(drf_views.APIView):
 
         episodes = []
         if "episodes" in media_metadata and media_metadata["episodes"] is not None:
-            episodes = media_metadata["episodes"] or []
-            for episode in episodes:
-                episode["item_id"] = (
-                    f"{media_type}/{source}/{media_id}/{season_number}/{episode.get('episode_number')}"
-                )
-                episode["parent_id"] = (
-                    f"{media_type}/{source}/{media_id}/{season_number}"
-                )
+            episodes = media_metadata["episodes"]
 
-        paginated = paginate_data(request, episodes, limit, offset, "episodes")
+        paginated = paginate_data(request, episodes, limit, offset)
+        paginated["results"] = serialize_data(
+            paginated["results"],
+            many=True,
+            context={"source": source},
+            serializer_class=EpisodeSerializer,
+        )
         return Response(paginated, status=200)
 
 
@@ -1103,21 +997,19 @@ class MediaSeasonHistoryView(drf_views.APIView):
             season_number=season_number,
         )
 
-        timeline_entries = []
-        if user_medias.exists():
-            timeline_entries = [
-                entry
-                for media in user_medias
-                if (history := media.history.all())
-                for entry in process_history_entries(history, "season")
-            ]
+        entries = get_history_entries(user_medias, media_type)
 
         paginated_data = paginate_data(
             request,
-            timeline_entries,
+            entries,
             limit,
             offset,
-            "history",
+        )
+        paginated_data["results"] = serialize_data(
+            paginated_data["results"],
+            many=True,
+            context={"request": request, "media_type": media_type},
+            serializer_class=HistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
 
@@ -1130,6 +1022,7 @@ class MediaSeasonSyncView(drf_views.APIView):
 
     def post(self, _, media_type, source, media_id, season_number):
         """Trigger sync of metadata from provider (non-manual sources only)."""
+        # TODO: see if it can be simplified reducing the number of return statements
         if not check_valid_type(media_type):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
@@ -1288,7 +1181,6 @@ class MediaEpisodeDetailView(drf_views.APIView):
                 {"detail": f"{get_http_message(404)} Episode not found."},
                 status=404,
             )
-
         if "episodes" in media_metadata and media_metadata["episodes"] is not None:
             episode = next(
                 (
@@ -1305,21 +1197,6 @@ class MediaEpisodeDetailView(drf_views.APIView):
                     status=404,
                 )
 
-            episode["item_id"] = (
-                f"{media_type}/{source}/{media_id}/{season_number}/{episode_number}"
-            )
-            episode["parent_id"] = f"{media_type}/{source}/{media_id}/{season_number}"
-
-        tracked = False
-        created = ""
-        score = ""
-        progress = ""
-        progressed_at = ""
-        status = ""
-        start_date = ""
-        end_date = ""
-        notes = ""
-
         try:
             user_medias = BasicMedia.objects.filter_media_prefetch(
                 user,
@@ -1335,74 +1212,22 @@ class MediaEpisodeDetailView(drf_views.APIView):
                 status=500,
             )
 
-        if user_medias:
-            serialized = MediaSerializer(user_medias[0]).data
-            # print(serialized)
-            tracked = True
-            created = serialized["created_at"]
-            score = serialized["score"]
-            # progress = serialized["progress"]
-            # progressed_at = serialized["progressed_at"]
-            status = 3
-            start_date = serialized["start_date"]
-            end_date = serialized["end_date"]
-            # notes = serialized["notes"]
+        # TODO: This gets only the first media consumption, but the API needs to manage/display every consumption
+        user_media = user_medias[0] if user_medias else None
 
-        episode["item_id"] = (
-            f"{media_type}/{source}/{media_id}/{season_number}/{episode_number}"
-        )
-        episode["parent_id"] = f"{media_type}/{source}/{media_id}/{season_number}"
-        episode["tracked"] = tracked
-        episode["user_created"] = created
-        episode["user_score"] = score
-        episode["user_progress"] = progress
-        episode["user_progressed_at"] = progressed_at
-        episode["user_status"] = status
-        episode["user_start_date"] = start_date
-        episode["user_end_date"] = end_date
-        episode["user_notes"] = notes
+        media_metadata.pop("episodes")
 
-        # Get season source_url and append episode number
-        season_source_url = media_metadata.get("source_url")
-        source_url = None
-        if season_source_url:
-            source_url = f"{season_source_url}/episode/{episode_number}"
-
-        complete_media = {
-            "media_id": int(media_id),
-            "source": source,
-            "source_url": source_url,
-            "title": episode.get("name"),
-            "max_progress": 1,
-            "image": episode.get("still_path"),
-            "synopsis": episode.get("overview"),
-            "genres": media_metadata.get("genres", []),
-            "score": episode.get("vote_average"),
-            "score_count": episode.get("vote_count"),
-            "details": {
-                "air_date": episode.get("air_date"),
-                "episode_number": episode.get("episode_number"),
-                "season_number": episode.get("season_number"),
-                "runtime": episode.get("runtime"),
-                "episode_type": episode.get("episode_type"),
-                "crew": episode.get("crew", []),
-                "guest_stars": episode.get("guest_stars", []),
-            },
-            "related": {},
-            "item_id": episode["item_id"],
-            "parent_id": episode["parent_id"],
-            "tracked": episode["tracked"],
-            "user_created": episode["user_created"],
-            "user_score": episode["user_score"],
-            "user_progress": episode["user_progress"],
-            "user_progressed_at": episode["user_progressed_at"],
-            "user_status": episode["user_status"],
-            "user_start_date": episode["user_start_date"],
-            "user_end_date": episode["user_end_date"],
-            "user_notes": episode["user_notes"],
+        data = {
+            "media_metadata": media_metadata,
+            "episode": episode,
+            "user_media": user_media,
         }
 
-        return Response(complete_media, status=200)
+        serialized = serialize_data(
+            data,
+            serializer_class=CompleteEpisodeSerializer,
+        )
+        return Response(serialized, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/
@@ -1448,21 +1273,19 @@ class MediaEpisodeHistoryView(drf_views.APIView):
             episode_number=episode_number,
         )
 
-        timeline_entries = []
-        if user_medias.exists():
-            timeline_entries = [
-                entry
-                for media in user_medias
-                if (history := media.history.all())
-                for entry in process_history_entries(history, "episode")
-            ]
+        entries = get_history_entries(user_medias, media_type)
 
         paginated_data = paginate_data(
             request,
-            timeline_entries,
+            entries,
             limit,
             offset,
-            "history",
+        )
+        paginated_data["results"] = serialize_data(
+            paginated_data["results"],
+            many=True,
+            context={"request": request, "media_type": media_type},
+            serializer_class=HistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
 
@@ -1524,6 +1347,7 @@ class SearchProviderView(drf_views.APIView):
             )
 
         if source == Sources.MANUAL.value:
+            # TODO: search for manual source should query only already tracked media
             # Since manual source data is user-defined and not indexed,
             # searching is not supported
             return Response(
@@ -1607,13 +1431,23 @@ class StatisticsView(drf_views.APIView):
         user = request.user
         start_date = request.GET.get("start_date", one_year_ago)
         end_date = request.GET.get("end_date", today)
+        if not start_date:
+            start_date = one_year_ago
+        if not end_date:
+            end_date = today
 
         if start_date == "all" and end_date == "all":
             start_date = None
             end_date = None
         else:
-            start_date = parse_date(start_date)
-            end_date = parse_date(end_date)
+            try:
+                start_date = try_parse_date(start_date)
+                end_date = try_parse_date(end_date)
+            except (TypeError, ValueError):
+                return Response(
+                    {"detail": f"{get_http_message(400)} Invalid date format."},
+                    status=400,
+                )
 
             if start_date and end_date:
                 start_date = make_aware(
@@ -1645,15 +1479,16 @@ class StatisticsView(drf_views.APIView):
             "activity_data": activity_data,
             "media_type_distribution": media_type_distribution,
             "score_distribution": score_distribution,
-            "top_rated": MediaSerializer(top_rated, many=True).data,
+            "top_rated": serialize_data(top_rated, many=True),
             "status_distribution": status_distribution,
             "status_pie_chart_data": status_pie_chart_data,
             "timeline": {
-                month: TimelineItemSerializer(
+                month: serialize_data(
                     items,
                     many=True,
                     context={"request": request},
-                ).data
+                    serializer_class=TimelineItemSerializer,
+                )
                 for month, items in (timeline or {}).items()
             },
         }

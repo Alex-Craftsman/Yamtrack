@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.8
+  version: 0.0.9
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -1161,7 +1161,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedMedia"
+                $ref: "#/components/schemas/PaginatedEpisodes"
         "400":
           description: Bad Request
           content:
@@ -1731,7 +1731,6 @@ components:
                 type: string
                 format: uri
     CompleteMedia:
-    # TODO: missing `media_type` field?
       type: object
       properties:
         media_id:
@@ -1741,6 +1740,8 @@ components:
         source_url:
           type: string
           format: uri
+        media_type:
+          $ref: "#/components/schemas/MediaTypesComplete"
         title:
           type: string
         max_progress:
@@ -1801,7 +1802,8 @@ components:
           type: integer
           nullable: true
         user_progressed_at:
-          type: integer
+          type: string
+          format: timestamp
           nullable: true
         user_status:
           $ref: "#/components/schemas/MediaStatus"
@@ -2058,12 +2060,15 @@ components:
         profile_path:
           type: string
           nullable: true
-    History:
+    HistoryRecord:
       type: object
       properties:
         id:
           type: integer
           description: The history change id
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+          description: The id of the media item
         timestamp:
           type: string
           format: date-time
@@ -2076,6 +2081,13 @@ components:
               field:
                 type: string
                 description: The media field changed
+                enum:
+                  - end_date
+                  - notes
+                  - progress
+                  - score
+                  - start_date
+                  - status
               old_value:
                 type: string
                 description: The value before the change
@@ -2084,62 +2096,6 @@ components:
                 type: string
                 description: The value after the change
                 nullable: true
-    HistoryRecord:
-      type: object
-      properties:
-        id:
-          type: integer
-          description: The history change id
-        timestamp:
-          type: string
-          format: timestamp
-          description: The timestamp of the change
-        type:
-          $ref: "#/components/schemas/HistoryRecordType"
-          description: The type of change
-        change_reason:
-          type: string
-          description: The reason of the change
-          nullable: true
-        score:
-          type: number
-          description: The new score
-          nullable: true
-        progress:
-          type: integer
-          description: The progress value
-          nullable: true
-        status:
-          $ref: "#/components/schemas/MediaStatus"
-        start_date:
-          type: string
-          format: timestamp
-          description: The start date of the media
-          nullable: true
-        end_date:
-          type: string
-          format: timestamp
-          description: The end date of the media
-          nullable: true
-        notes:
-          type: string
-          description: The notes added to the media
-          nullable: true
-    HistoryRecordType:
-      type: integer
-      enum:
-        - 0
-        - 1
-        - 2
-      x-enumNames:
-        - Removed
-        - Changed
-        - Added
-      description: |
-        Integer mapping for HistoryType:
-          0 = Removed
-          1 = Changed
-          2 = Added
     Item:
       type: object
       properties:
@@ -2167,6 +2123,7 @@ components:
     ItemId:
       type: string
       description: media_type/media_source/media_id(/season/episode)
+      nullable: true
     MangaDetails:
       # TODO: missing fields
       type: object
@@ -2231,6 +2188,7 @@ components:
           2 = Paused
           3 = Completed
           4 = Dropped
+      nullable: true
     MediaTypes:
       type: string
       enum:
@@ -2289,6 +2247,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CalendarEvent"
+    PaginatedEpisodes:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Episode"
     PaginatedHistory:
       type: object
       properties:
@@ -2297,7 +2264,7 @@ components:
         results:
           type: array
           items:
-            $ref: "#/components/schemas/History"
+            $ref: "#/components/schemas/HistoryRecord"
     PaginatedMedia:
       type: object
       properties:
@@ -2361,7 +2328,7 @@ components:
           title:
             type: string
     SearchItem:
-    # TODO: add item_id and tracked field for already tracked items
+      # TODO: add item_id and tracked field for already tracked items
       type: object
       properties:
         media_id:
@@ -2607,12 +2574,20 @@ components:
       properties:
         format:
           type: string
-        release_date:
+        first_air_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        last_air_date:
           type: string
           format: date
           description: Date in YYYY-MM-DD format
         status:
           type: string
+        seasons:
+          type: integer
+        episodes:
+          type: integer
         runtime:
           type: string
           description: Human formatted duration (1h 20m)
@@ -2642,29 +2617,4 @@ components:
           type: array
           description: Related seasons
           items:
-            type: object
-            properties:
-              item_id:
-                $ref: "#/components/schemas/ItemId"
-                description: ItemId of the season (type/source/media_id/season_number)
-              source:
-                type: string
-              media_type:
-                type: string
-              image:
-                type: string
-                format: uri
-              media_id:
-                type: integer
-              title:
-                type: string
-              season_number:
-                type: integer
-              season_title:
-                type: string
-              first_air_date:
-                type: string
-                format: date
-                description: Date in YYYY-MM-DD format
-              max_progress:
-                type: integer
+            $ref: "#/components/schemas/Season"

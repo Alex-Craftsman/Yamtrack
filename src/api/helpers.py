@@ -20,8 +20,6 @@ from app.models import (
 )
 from users.models import MediaStatusChoices
 
-from .serializers import EpisodeSerializer, EventSerializer, MediaSerializer
-
 logger = logging.getLogger(__name__)
 
 HTTP_STATUS_MAP = {
@@ -113,14 +111,10 @@ def build_item_id(item):
     media_type = item.media_type
     children = ""
 
-    if item.media_type == "season" and hasattr(item, "season_number"):
+    if item.media_type == "season":
         children = f"/{item.season_number}"
         media_type = "tv"
-    elif (
-        item.media_type == "episode"
-        and hasattr(item, "season_number")
-        and hasattr(item, "episode_number")
-    ):
+    elif item.media_type == "episode":
         children = f"/{item.season_number}/{item.episode_number}"
         media_type = "tv"
 
@@ -176,16 +170,62 @@ def fetch_media_list(user, media_type, status, sort_filter, search):
     )
 
 
-def get_complete_sorts(media_type):
+def fetch_results_for_type(user, media_type, status, sort, search):
+    """Fetch and sort results for a specific media type."""
+    sort_list = get_sorts(media_type, sort_type="existing")
+    media_sort = sort if sort in sort_list else ""
+    already_sorted = bool(media_sort)
+
+    results = fetch_media_list(user, media_type, status, media_sort, search)
+
+    if not already_sorted and sort:
+        if sort in get_sorts(media_type, sort_type="manual"):
+            results = apply_manual_sort_for_type(results, sort)
+        else:
+            return None, True
+
+    return results, False
+
+
+def fetch_results_all_types(user, status, sort, search, exclude):
+    """Fetch and sort results across all media types."""
+    excluded_set = {e.strip().lower() for e in exclude if e and e.strip()}
+    allowed_types = [t for t in MEDIA_TYPE_VALID_LIST if t not in excluded_set]
+
+    results = []
+    for t in allowed_types:
+        results.extend(fetch_media_list(user, t, status, "", search))
+
+    if sort:
+        sort_list = get_sorts(None, sort_type="all")
+        if sort in sort_list:
+            results = apply_aggregated_sort(results, sort)
+        else:
+            return None, True
+
+    return results, False
+
+
+def get_sorts(media_type, *, sort_type="all"):
     """Return the list of valid sorts for complete media types."""
-    sort_list = EXISTING_SORTS.copy()
-    if media_type == MediaTypes.SEASON.value:
-        sort_list += SEASONS_ADDITIONAL_SORTS
-    if media_type == MediaTypes.EPISODE.value:
-        sort_list += EPISODES_ADDITIONAL_SORTS
-    if media_type is None:
+    if sort_type == "all":
+        sort_list = EXISTING_SORTS.copy()
+        if media_type == MediaTypes.SEASON.value:
+            sort_list += SEASONS_ADDITIONAL_SORTS
+        if media_type == MediaTypes.EPISODE.value:
+            sort_list += EPISODES_ADDITIONAL_SORTS
         sort_list += MANUAL_SORTS
-    return sort_list
+        return sort_list
+    if sort_type == "manual":
+        return MANUAL_SORTS
+    if sort_type == "existing":
+        sort_list = EXISTING_SORTS.copy()
+        if media_type == MediaTypes.SEASON.value:
+            sort_list += SEASONS_ADDITIONAL_SORTS
+        if media_type == MediaTypes.EPISODE.value:
+            sort_list += EPISODES_ADDITIONAL_SORTS
+        return sort_list
+    return []
 
 
 def get_http_message(status):
@@ -206,28 +246,16 @@ def make_page_url(request, limit, new_offset):
     return request.build_absolute_uri(request.path + "?" + urlencode(params))
 
 
-def paginate_data(request, results, limit, offset, data_type):
-    # TODO!: create better pagination function, with all possible serializers, and type handling
-    """Paginate the results based on the limit and offset."""
+def paginate_data(request, results, limit, offset):
+    """Paginate the results based on the limit and offset.
+
+    Returns raw paginated data without serialization.
+    Serialization should be handled by the view.
+    """
     total = len(results)
     start = offset
     end = offset + limit
     paginated = results[start:end]
-    serialized_data = paginated
-
-    if data_type == "media":
-        serialized_data = []
-        for item in paginated:
-            if isinstance(item, Episode):
-                serialized_data.append(
-                    EpisodeSerializer(item, context={"request": request}).data,
-                )
-            else:
-                serialized_data.append(
-                    MediaSerializer(item, context={"request": request}).data,
-                )
-    elif data_type == "events":
-        serialized = EventSerializer(paginated, many=True)
 
     next_url = None
     prev_url = None
@@ -244,10 +272,15 @@ def paginate_data(request, results, limit, offset, data_type):
         "next": next_url,
         "previous": prev_url,
     }
-    results_payload = (
-        serialized_data if data_type in ("media", "history", "seasons", "episodes") else serialized.data
-    )
-    return {"pagination": pagination, "results": results_payload}
+    return {"pagination": pagination, "results": paginated}
+
+
+def parse_excluded_items(request):
+    """Parse excluded items from the request query parameters."""
+    exclude_param = request.GET.get("exclude", "")
+    if exclude_param:
+        return exclude_param.split(",")
+    return []
 
 
 def parse_limit_offset(request):
@@ -302,6 +335,16 @@ def parse_limit_offset(request):
     return limit, offset, None
 
 
+def parse_status_param(status):
+    """Parse and validate status parameter."""
+    if not status:
+        return MediaStatusChoices.ALL
+    try:
+        return get_media_status(int(status))
+    except (TypeError, ValueError):
+        return None
+
+
 def try_parse_date(value):
     """Parse a date string and raise ValueError if invalid."""
     parsed = parse_date(value)
@@ -348,7 +391,8 @@ def apply_manual_sort_for_type(results, sort):
     """Apply manual sorts used when a single media type is requested."""
     if sort not in _AGGREGATED_MANUAL_SORT_KEYS:
         return Response(
-            {"detail": f"{get_http_message(400)} Invalid sorting"}, status=400,
+            {"detail": f"{get_http_message(400)} Invalid sorting"},
+            status=400,
         )
     return results
 
