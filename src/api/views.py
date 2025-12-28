@@ -135,7 +135,7 @@ class CalendarView(drf_views.APIView):
 
 
 # /api/v1/calendar/update/
-class UpdateCalendarView(drf_views.APIView):
+class CalendarUpdateView(drf_views.APIView):
     """Update calendar view."""
 
     permission_classes = [permissions.IsAuthenticated]

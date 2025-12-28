@@ -6,7 +6,7 @@ urlpatterns = [
     re_path(r"^calendar/?$", views.CalendarView.as_view(), name="api_calendar"),
     re_path(
         r"^calendar/update/?$",
-        views.UpdateCalendarView.as_view(),
+        views.CalendarUpdateView.as_view(),
         name="api_update_calendar",
     ),
     re_path(
