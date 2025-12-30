@@ -512,6 +512,51 @@ class MediaDetailView(drf_views.APIView):
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def delete(self, request, media_type, source, media_id):
+        """Delete a tracked media item for the authenticated user."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                user,
+                media_id,
+                media_type,
+                source,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        if not user_medias:
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found or not tracked."},
+                status=404,
+            )
+
+        # TODO: Handle better rewatches
+        for media in user_medias:
+            media.delete()
+
+        return Response(
+            status=204,
+        )
+
     def get(self, request, media_type, source, media_id):
         """Retrieve details of a specific media for the authenticated user."""
         user = request.user
@@ -573,9 +618,6 @@ class MediaDetailView(drf_views.APIView):
         return Response(serialized, status=200)
 
     def patch(self, request, media_type, source, media_id):  # noqa: ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
-
-    def delete(self, request, media_type, source, media_id):  # noqa: ARG002, D102
         return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
@@ -820,6 +862,60 @@ class MediaSeasonDetailView(drf_views.APIView):
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def delete(self, request, media_type, source, media_id, season_number):
+        """Delete a tracked season item for the authenticated user."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                user,
+                media_id,
+                "season",
+                source,
+                season_number=season_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        if not user_medias:
+            return Response(
+                {"detail": f"{get_http_message(404)} Season not found or not tracked."},
+                status=404,
+            )
+
+        # TODO: Handle better rewatches
+        for media in user_medias:
+            media.delete()
+
+        return Response(
+            status=204,
+        )
+
     def get(self, request, media_type, source, media_id, season_number):
         """Retrieve details of a specific season for the authenticated user."""
         user = request.user
@@ -892,6 +988,9 @@ class MediaSeasonDetailView(drf_views.APIView):
             serializer_class=CompleteMediaSerializer,
         )
         return Response(serialized, status=200)
+
+    def patch(self, request, media_type, source, media_id, season_number):  # noqa: ARG002, D102
+        return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/episodes/
@@ -1137,6 +1236,71 @@ class MediaEpisodeDetailView(drf_views.APIView):
     serializer_class = MediaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def delete(
+        self,
+        request,
+        media_type,
+        source,
+        media_id,
+        season_number,
+        episode_number,
+    ):
+        """Delete a tracked episode item for the authenticated user."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Episodes are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                user,
+                media_id,
+                "episode",
+                source,
+                season_number=season_number,
+                episode_number=episode_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        if not user_medias:
+            return Response(
+                {
+                    "detail": f"{get_http_message(404)} Episode not found or not tracked.",
+                },
+                status=404,
+            )
+
+        # TODO: Handle better rewatches
+        for media in user_medias:
+            media.delete()
+
+        return Response(
+            status=204,
+        )
+
     def get(self, request, media_type, source, media_id, season_number, episode_number):
         """Retrieve details of a specific episode for the authenticated user."""
         user = request.user
@@ -1228,6 +1392,17 @@ class MediaEpisodeDetailView(drf_views.APIView):
             serializer_class=CompleteEpisodeSerializer,
         )
         return Response(serialized, status=200)
+
+    def patch(
+        self,
+        request,
+        media_type,
+        source,
+        media_id,
+        season_number,
+        episode_number,
+    ):
+        return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/

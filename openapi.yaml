@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.9
+  version: 0.0.10
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -111,52 +111,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
   /api/v1/history/{media_type}/{history_id}/:
-    get:
-      tags:
-        - history
-      summary: Retrieve a specific history record by media type and history id
-      parameters:
-        - in: path
-          name: media_type
-          required: true
-          schema:
-            $ref: "#/components/schemas/MediaTypesComplete"
-        - in: path
-          name: history_id
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HistoryRecord"
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
     delete:
       tags:
         - history
@@ -203,6 +157,52 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - history
+      summary: Retrieve a specific history record by media type and history id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypesComplete"
+        - in: path
+          name: history_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryRecord"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/lists/:
     get:
       tags:
@@ -225,6 +225,19 @@ paths:
         "201":
           description: Created
   /api/v1/lists/{list_id}/:
+    delete:
+      tags:
+        - lists
+      summary: Delete a list
+      parameters:
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
     get:
       tags:
         - lists
@@ -257,19 +270,6 @@ paths:
       responses:
         "200":
           description: Updated
-    delete:
-      tags:
-        - lists
-      summary: Delete a list
-      parameters:
-        - in: path
-          name: list_id
-          required: true
-          schema:
-            type: integer
-      responses:
-        "204":
-          description: Deleted
   /api/v1/lists/{list_id}/items/:
     get:
       tags:
@@ -304,24 +304,6 @@ paths:
         "204":
           description: Added
   /api/v1/lists/{list_id}/items/{item_id}/:
-    get:
-      tags:
-        - lists
-      summary: Get an Item from a list
-      parameters:
-        - in: path
-          name: list_id
-          required: true
-          schema:
-            type: integer
-        - in: path
-          name: item_id
-          required: true
-          schema:
-            type: integer
-      responses:
-        "300":
-          description: Redirect to /api/v1/media/{media_type}/{source}/{media_id}/
     delete:
       tags:
         - lists
@@ -340,6 +322,24 @@ paths:
       responses:
         "204":
           description: Removed
+    get:
+      tags:
+        - lists
+      summary: Get an Item from a list
+      parameters:
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: item_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "300":
+          description: Redirect to /api/v1/media/{media_type}/{source}/{media_id}/
   /api/v1/media/:
     get:
       tags:
@@ -563,6 +563,53 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/:
+    delete:
+      tags:
+        - media
+      summary: Delete a tracked media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     get:
       tags:
         - media
@@ -667,53 +714,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-    delete:
-      tags:
-        - media
-      summary: Delete a tracked media item
-      parameters:
-        - in: path
-          name: media_type
-          required: true
-          schema:
-            $ref: "#/components/schemas/MediaTypes"
-        - in: path
-          name: source
-          required: true
-          schema:
-            $ref: "#/components/schemas/Source"
-        - in: path
-          name: media_id
-          required: true
-          schema:
-            type: integer
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/history/:
     get:
       tags:
@@ -781,6 +781,58 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/lists/:
+    delete:
+      tags:
+        - lists
+      summary: Remove the item's Item from a list
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     post:
       tags:
         - lists
@@ -810,58 +862,6 @@ paths:
       responses:
         "204":
           description: Added
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    delete:
-      tags:
-        - lists
-      summary: Remove the item's Item from a list
-      parameters:
-        - in: path
-          name: media_type
-          required: true
-          schema:
-            $ref: "#/components/schemas/MediaTypes"
-        - in: path
-          name: source
-          required: true
-          schema:
-            $ref: "#/components/schemas/Source"
-        - in: path
-          name: media_id
-          required: true
-          schema:
-            type: integer
-        - in: query
-          name: list_id
-          required: true
-          schema:
-            type: integer
-      responses:
-        "204":
-          description: Removed
         "400":
           description: Bad Request
           content:
@@ -1059,6 +1059,58 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/:
+    delete:
+      tags:
+        - media
+      summary: Delete a tracked media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     get:
       tags:
         - media
@@ -1317,6 +1369,63 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/:
+    delete:
+      tags:
+        - media
+      summary: Delete a tracked media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     get:
       tags:
         - media
