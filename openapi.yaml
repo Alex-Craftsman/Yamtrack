@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.10
+  version: 0.0.11
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -1899,34 +1899,13 @@ components:
         tracked:
           type: boolean
           description: If the current media is being tracked by Yamtrack
-        user_created:
-          type: string
-          format: date-time
-          nullable: true
-        user_score:
-          type: number
-          format: float
-          nullable: true
-        user_progress:
+        watches_number:
           type: integer
-          nullable: true
-        user_progressed_at:
-          type: string
-          format: timestamp
-          nullable: true
-        user_status:
-          $ref: "#/components/schemas/MediaStatus"
-        user_start_date:
-          type: string
-          format: date-time
-          nullable: true
-        user_end_date:
-          type: string
-          format: date-time
-          nullable: true
-        user_notes:
-          type: string
-          nullable: true
+          description: Number of times the media has been watched/tracked
+        watches:
+          type: array
+          items:
+            $ref: "#/components/schemas/WatchedInfos"
     CreateMedia:
       description: |
         Unified payload for creating media items. Use `source: manual` for manual items (omit `media_id`) or
@@ -2727,3 +2706,34 @@ components:
           description: Related seasons
           items:
             $ref: "#/components/schemas/Season"
+    WatchedInfos:
+      type: object
+      properties:
+        created:
+          type: string
+          format: date-time
+          nullable: true
+        score:
+          type: number
+          format: float
+          nullable: true
+        progress:
+          type: integer
+          nullable: true
+        progressed_at:
+          type: string
+          format: timestamp
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
