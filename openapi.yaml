@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.11
+  version: 0.0.12
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -110,11 +110,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/history/{media_type}/{history_id}/:
+  /api/v1/changes_history/{media_type}/{history_id}/:
     delete:
       tags:
         - history
-      summary: Delete a specific history record by media type and history id
+      summary: Delete a specific changes history record by media type and history id
       parameters:
         - in: path
           name: media_type
@@ -160,7 +160,7 @@ paths:
     get:
       tags:
         - history
-      summary: Retrieve a specific history record by media type and history id
+      summary: Retrieve a specific changes history record by media type and history id
       parameters:
         - in: path
           name: media_type
@@ -178,7 +178,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HistoryRecord"
+                $ref: "#/components/schemas/ChangesHistoryRecord"
         "400":
           description: Bad Request
           content:
@@ -714,12 +714,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/media/{media_type}/{source}/{media_id}/history/:
+  /api/v1/media/{media_type}/{source}/{media_id}/changes_history/:
     get:
       tags:
         - media
         - history
-      summary: Get history records for a media item
+      summary: Get changes history records for a media item
       parameters:
         - in: path
           name: media_type
@@ -755,7 +755,73 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedHistory"
+                $ref: "#/components/schemas/PaginatedChangesHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/history/:
+    get:
+      tags:
+        - media
+        - history
+      summary: Get watch history records for a media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedWatchHistory"
         "400":
           description: Bad Request
           content:
@@ -1238,12 +1304,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/history/:
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/changes_history/:
     get:
       tags:
         - media
         - history
-      summary: Get history records for a season
+      summary: Get changes history records for a season
       parameters:
         - in: path
           name: media_type
@@ -1284,7 +1350,78 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedHistory"
+                $ref: "#/components/schemas/PaginatedChangesHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/history/:
+    get:
+      tags:
+        - media
+        - history
+      summary: Get watch history records for a season
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedWatchHistory"
         "400":
           description: Bad Request
           content:
@@ -1487,12 +1624,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/history/:
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/changes_history/:
     get:
       tags:
         - media
         - history
-      summary: Get history records for an episode
+      summary: Get changes history records for an episode
       parameters:
         - in: path
           name: media_type
@@ -1538,7 +1675,83 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedHistory"
+                $ref: "#/components/schemas/PaginatedChangesHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/history/:
+    get:
+      tags:
+        - media
+        - history
+      summary: Get watch history records for an episode
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedWatchHistory"
         "400":
           description: Bad Request
           content:
@@ -2148,12 +2361,12 @@ components:
         profile_path:
           type: string
           nullable: true
-    HistoryRecord:
+    ChangesHistoryRecord:
       type: object
       properties:
         id:
           type: integer
-          description: The history change id
+          description: The changes history change id
         item_id:
           $ref: "#/components/schemas/ItemId"
           description: The id of the media item
@@ -2344,7 +2557,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Episode"
-    PaginatedHistory:
+    PaginatedChangesHistory:
       type: object
       properties:
         pagination:
@@ -2352,7 +2565,7 @@ components:
         results:
           type: array
           items:
-            $ref: "#/components/schemas/HistoryRecord"
+            $ref: "#/components/schemas/ChangesHistoryRecord"
     PaginatedMedia:
       type: object
       properties:
@@ -2380,6 +2593,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Season"
+    PaginatedWatchHistory:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/WatchedInfos"
     Pagination:
       type: object
       properties:
@@ -2645,7 +2867,7 @@ components:
           description: Score distribution for each media type
         top_rated:
           type: array
-          items: 
+          items:
             $ref: "#/components/schemas/Media"
           description: Array of top rated medias
         status_distribution:

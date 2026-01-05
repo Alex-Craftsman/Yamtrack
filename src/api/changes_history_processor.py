@@ -5,7 +5,7 @@ from app.models import MediaTypes
 EXCLUDED_FIELDS = {"id", "item", "user", "related_tv", "related_season"}
 
 
-def delete_history_entry(media_type, history_id, user):
+def delete_changes_history_entry(media_type, history_id, user):
     """Delete a history entry for a given media type and user."""
     historical_model = apps.get_model(
         app_label="app",
@@ -18,7 +18,7 @@ def delete_history_entry(media_type, history_id, user):
     ).delete()
 
 
-def get_history_entry(media_type, history_id, user):
+def get_changes_history_entry(media_type, history_id, user):
     """Retrieve an history entry for a given media type and user."""
     historical_model = apps.get_model(
         app_label="app",
@@ -37,7 +37,7 @@ def get_history_entry(media_type, history_id, user):
     return record
 
 
-def get_history_entries(user_medias, media_type):
+def get_changes_history_entries(user_medias, media_type):
     """Get all raw historical records for given user medias.
 
     Returns a list of historical records with item_obj attached,

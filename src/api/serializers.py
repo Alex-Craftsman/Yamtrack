@@ -16,8 +16,11 @@ from app.models import (
 )
 from events.models import Event
 
+from .changes_history_processor import (
+    get_changes_from_diff,
+    get_changes_from_new_record,
+)
 from .helpers import build_item_id, build_parent_id, get_http_message, get_media_status
-from .history_processor import get_changes_from_diff, get_changes_from_new_record
 
 
 class ItemIdField(serializers.Field):
@@ -56,7 +59,7 @@ class CompleteEpisodeSerializer(serializers.Serializer):
         """Transform episode data into CompleteEpisode response."""
         media_metadata = instance.get("media_metadata", {})
         episode = instance.get("episode", {})
-        user_media = instance.get("user_media", {})
+        user_medias = instance.get("user_medias", [])
         media_type = media_metadata.get("media_type")
 
         temp_episode = type("TempEpisode", (), {})()
@@ -76,6 +79,21 @@ class CompleteEpisodeSerializer(serializers.Serializer):
             if episode.get("still_path")
             else None
         )
+
+        watches_number = len(user_medias)
+        watches = [
+            {
+                "created": user_media.created_at,
+                "score": None,
+                "progress": 1 if bool(user_media) else 0,
+                "progressed_at": user_media.created_at,
+                "status": 3 if bool(user_media) else None,
+                "start_date": user_media.created_at,
+                "end_date": user_media.created_at,
+                "notes": "",
+            }
+            for user_media in user_medias
+        ]
 
         return {
             "media_id": int(media_metadata.get("media_id")),
@@ -101,15 +119,9 @@ class CompleteEpisodeSerializer(serializers.Serializer):
             "related": {},
             "item_id": ItemIdField().to_representation(temp_episode),
             "parent_id": ParentIdField().to_representation(temp_episode),
-            "tracked": bool(user_media),
-            "user_created": user_media.created_at,
-            "user_score": None,
-            "user_progress": 1 if bool(user_media) else 0,
-            "user_progressed_at": user_media.created_at,
-            "user_status": 3 if bool(user_media) else None,
-            "user_start_date": user_media.created_at,
-            "user_end_date": user_media.created_at,
-            "user_notes": "",
+            "tracked": watches_number > 0,
+            "watches_number": watches_number,
+            "watches": watches,
         }
 
 
@@ -161,7 +173,7 @@ class CompleteMediaSerializer(serializers.Serializer):
     def to_representation(self, instance):
         """Transform media_metadata and user data into CompleteMedia response."""
         media_metadata = instance.get("media_metadata", {})
-        user_media = instance.get("user_media")
+        user_medias = instance.get("user_medias")
         media_type = media_metadata.get("media_type")
 
         if media_type == MediaTypes.TV.value:
@@ -182,6 +194,35 @@ class CompleteMediaSerializer(serializers.Serializer):
             details["last_issue_id"] = media_metadata.pop("last_issue_id")
         related = media_metadata.get("related", {})
 
+        watches_number = len(user_medias)
+        watches = [
+            {
+                "created": user_media.created_at
+                if hasattr(user_media, "created_at")
+                else None,
+                "score": float(user_media.score)
+                if hasattr(user_media, "score")
+                else None,
+                "progress": int(user_media.progress)
+                if hasattr(user_media, "progress")
+                else None,
+                "progressed_at": user_media.progressed_at
+                if hasattr(user_media, "progressed_at")
+                else None,
+                "status": StatusField().to_representation(user_media),
+                "start_date": user_media.start_date
+                if hasattr(user_media, "start_date")
+                else None,
+                "end_date": user_media.end_date
+                if hasattr(user_media, "end_date")
+                else None,
+                "notes": user_media.notes if hasattr(user_media, "notes") else None,
+            }
+            for user_media in user_medias
+        ]
+
+        # TODO: Check why some informations take a while to update after a change
+
         return {
             "media_id": int(media_metadata.get("media_id")),
             "source": media_metadata.get("source"),
@@ -199,27 +240,9 @@ class CompleteMediaSerializer(serializers.Serializer):
             "related": related,
             "item_id": ItemIdField().to_representation(temp_media),
             "parent_id": ParentIdField().to_representation(temp_media),
-            "tracked": bool(user_media),
-            "user_created": user_media.created_at
-            if hasattr(user_media, "created_at")
-            else None,
-            "user_score": float(user_media.score)
-            if hasattr(user_media, "score")
-            else None,
-            "user_progress": int(user_media.progress)
-            if hasattr(user_media, "progress")
-            else None,
-            "user_progressed_at": user_media.progressed_at
-            if hasattr(user_media, "progressed_at")
-            else None,
-            "user_status": StatusField().to_representation(user_media),
-            "user_start_date": user_media.start_date
-            if hasattr(user_media, "start_date")
-            else None,
-            "user_end_date": user_media.end_date
-            if hasattr(user_media, "end_date")
-            else None,
-            "user_notes": user_media.notes if hasattr(user_media, "notes") else None,
+            "tracked": watches_number > 0,
+            "watches_number": watches_number,
+            "watches": watches,
         }
 
 

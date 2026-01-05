@@ -25,6 +25,11 @@ from events import tasks
 from events.models import Event
 from users.models import MediaStatusChoices
 
+from .changes_history_processor import (
+    delete_changes_history_entry,
+    get_changes_history_entries,
+    get_changes_history_entry,
+)
 from .helpers import (
     MEDIA_TYPE_COMPLETE_MODEL_MAP,
     check_source_type,
@@ -40,11 +45,6 @@ from .helpers import (
     parse_sort_filter,
     parse_status_param,
     try_parse_date,
-)
-from .history_processor import (
-    delete_history_entry,
-    get_history_entries,
-    get_history_entry,
 )
 from .serializers import (
     CompleteEpisodeSerializer,
@@ -64,6 +64,8 @@ from .serializers import (
 # TODO: Implement search for already tracked media (item_id and tracked fields)
 
 # TODO: Implement global search endpoint for every media_type
+
+# TODO: Implement admin commands to manage users (add admins, remove/add users, etc)
 
 
 # /api/v1/calendar/
@@ -149,14 +151,14 @@ class CalendarUpdateView(drf_views.APIView):
         )
 
 
-# /api/v1/history/[media_type]/[history_id]
-class MediaTypeHistoryDetailView(drf_views.APIView):
-    """History record view."""
+# /api/v1/changes_history/[media_type]/[history_id]
+class MediaTypeChangesHistoryDetailView(drf_views.APIView):
+    """Changes history record view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, history_id):
-        """Retrieve the history record for a specific media."""
+        """Retrieve the changes history record for a specific media."""
         if not check_valid_type(media_type, complete=True):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
@@ -164,7 +166,7 @@ class MediaTypeHistoryDetailView(drf_views.APIView):
             )
 
         try:
-            record = get_history_entry(media_type, history_id, request.user)
+            record = get_changes_history_entry(media_type, history_id, request.user)
             serialized_data = serialize_data(
                 record,
                 context={"media_type": media_type},
@@ -181,7 +183,7 @@ class MediaTypeHistoryDetailView(drf_views.APIView):
             )
 
     def delete(self, request, media_type, history_id):
-        """Delete the history record for a specific media."""
+        """Delete the changes history record for a specific media."""
         if not check_valid_type(media_type, complete=True):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
@@ -189,7 +191,7 @@ class MediaTypeHistoryDetailView(drf_views.APIView):
             )
 
         try:
-            delete_history_entry(media_type, history_id, request.user)
+            delete_changes_history_entry(media_type, history_id, request.user)
             return Response({"detail": "Record removed correctly"}, status=204)
         except Exception as e:
             return Response(
@@ -321,6 +323,7 @@ class MediaTypeListView(drf_views.APIView):
 
     def get(self, request, media_type):
         """Retrieve the list of media of a specific media type."""
+        # TODO: handle multiple watches of the same media item
         user = request.user
         status = request.GET.get("status", "")
         search = request.GET.get("search", "")
@@ -596,9 +599,6 @@ class MediaDetailView(drf_views.APIView):
                 status=500,
             )
 
-        # TODO: This gets only the first media consumption, but the API needs to manage/display every consumption
-        user_media = user_medias[0] if user_medias else None
-
         if (
             "related" in media_metadata
             and media_metadata["related"] is not None
@@ -608,7 +608,7 @@ class MediaDetailView(drf_views.APIView):
 
         data = {
             "media_metadata": media_metadata,
-            "user_media": user_media,
+            "user_medias": user_medias,
         }
 
         serialized = serialize_data(
@@ -663,14 +663,14 @@ class MediaRecommendationsView(drf_views.APIView):
         return Response(recommendations, status=200)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/history/
-class MediaHistoryView(drf_views.APIView):
-    """Media history view."""
+# /api/v1/media/[media_type]/[source]/[media_id]/changes_history/
+class MediaChangesHistoryView(drf_views.APIView):
+    """Media changes history view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id):
-        """Retrieve history timeline entries for a specific media."""
+        """Retrieve changes history timeline entries for a specific media."""
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
@@ -696,7 +696,7 @@ class MediaHistoryView(drf_views.APIView):
             source,
         )
 
-        entries = get_history_entries(user_medias, media_type)
+        entries = get_changes_history_entries(user_medias, media_type)
 
         paginated_data = paginate_data(
             request,
@@ -975,12 +975,9 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=500,
             )
 
-        # TODO: This gets only the first media consumption, but the API needs to manage/display every consumption
-        user_media = user_medias[0] if user_medias else None
-
         data = {
             "media_metadata": media_metadata,
-            "user_media": user_media,
+            "user_medias": user_medias,
         }
 
         serialized = serialize_data(
@@ -1054,14 +1051,14 @@ class MediaSeasonEpisodesView(drf_views.APIView):
         return Response(paginated, status=200)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/
-class MediaSeasonHistoryView(drf_views.APIView):
-    """History season view."""
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/changes_history/
+class MediaChangesSeasonHistoryView(drf_views.APIView):
+    """Changes history season view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id, season_number):
-        """Retrieve history timeline entries for a specific season of a tv serie."""
+        """Retrieve changes history timeline entries for a specific season of a tv serie."""
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
@@ -1096,7 +1093,7 @@ class MediaSeasonHistoryView(drf_views.APIView):
             season_number=season_number,
         )
 
-        entries = get_history_entries(user_medias, media_type)
+        entries = get_changes_history_entries(user_medias, media_type)
 
         paginated_data = paginate_data(
             request,
@@ -1376,15 +1373,12 @@ class MediaEpisodeDetailView(drf_views.APIView):
                 status=500,
             )
 
-        # TODO: This gets only the first media consumption, but the API needs to manage/display every consumption
-        user_media = user_medias[0] if user_medias else None
-
         media_metadata.pop("episodes")
 
         data = {
             "media_metadata": media_metadata,
             "episode": episode,
-            "user_media": user_media,
+            "user_medias": user_medias,
         }
 
         serialized = serialize_data(
@@ -1405,14 +1399,14 @@ class MediaEpisodeDetailView(drf_views.APIView):
         return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/
-class MediaEpisodeHistoryView(drf_views.APIView):
-    """History episode view."""
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/changes_history/
+class MediaChangesEpisodeHistoryView(drf_views.APIView):
+    """Changes history episode view."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id, season_number, episode_number):
-        """Retrieve history timeline entries for a specific episode of a tv serie."""
+        """Retrieve changes history timeline entries for a specific episode of a tv serie."""
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
@@ -1448,7 +1442,7 @@ class MediaEpisodeHistoryView(drf_views.APIView):
             episode_number=episode_number,
         )
 
-        entries = get_history_entries(user_medias, media_type)
+        entries = get_changes_history_entries(user_medias, media_type)
 
         paginated_data = paginate_data(
             request,

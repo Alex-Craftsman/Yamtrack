@@ -10,9 +10,9 @@ urlpatterns = [
         name="api_update_calendar",
     ),
     re_path(
-        r"^history/(?P<media_type>[^/]+)/(?P<history_id>[^/]+)/?$",
-        views.MediaTypeHistoryDetailView.as_view(),
-        name="api_media_history_detail",
+        r"^changes_history/(?P<media_type>[^/]+)/(?P<history_id>[^/]+)/?$",
+        views.MediaTypeChangesHistoryDetailView.as_view(),
+        name="api_media_changes_history_detail",
     ),
     re_path(r"^lists/?$", views.ListsView.as_view(), name="api_lists"),
     re_path(
@@ -42,9 +42,9 @@ urlpatterns = [
         name="api_media_detail",
     ),
     re_path(
-        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/history/?$",
-        views.MediaHistoryView.as_view(),
-        name="api_media_history",
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/changes_history/?$",
+        views.MediaChangesHistoryView.as_view(),
+        name="api_media_changes_history",
     ),
     re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/lists/?$",
@@ -77,9 +77,9 @@ urlpatterns = [
         name="api_media_season_episodes",
     ),
     re_path(
-        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/history/?$",
-        views.MediaSeasonHistoryView.as_view(),
-        name="api_media_season_history",
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/changes_history/?$",
+        views.MediaSeasonChangesHistoryView.as_view(),
+        name="api_media_season_changes_history",
     ),
     re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/sync/?$",
@@ -92,9 +92,9 @@ urlpatterns = [
         name="api_media_episode_detail",
     ),
     re_path(
-        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/history/?$",
-        views.MediaEpisodeHistoryView.as_view(),
-        name="api_media_episode_history",
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/changes_history/?$",
+        views.MediaEpisodeChangesHistoryView.as_view(),
+        name="api_media_episode_changes_history",
     ),
     re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/sync/?$",
