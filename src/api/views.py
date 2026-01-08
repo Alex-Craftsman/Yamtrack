@@ -1052,7 +1052,7 @@ class MediaSeasonEpisodesView(drf_views.APIView):
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/changes_history/
-class MediaChangesSeasonHistoryView(drf_views.APIView):
+class MediaSeasonChangesHistoryView(drf_views.APIView):
     """Changes history season view."""
 
     permission_classes = [permissions.IsAuthenticated]
@@ -1400,7 +1400,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/changes_history/
-class MediaChangesEpisodeHistoryView(drf_views.APIView):
+class MediaEpisodeChangesHistoryView(drf_views.APIView):
     """Changes history episode view."""
 
     permission_classes = [permissions.IsAuthenticated]
