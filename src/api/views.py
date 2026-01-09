@@ -621,48 +621,6 @@ class MediaDetailView(drf_views.APIView):
         return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/recommendations/
-class MediaRecommendationsView(drf_views.APIView):
-    """Media recommendations view."""
-
-    serializer_class = MediaSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, _, media_type, source, media_id):
-        """Retrieve recommendations for a specific media."""
-        if not check_valid_type(media_type):
-            return Response(
-                {"detail": f"{get_http_message(400)} Unsupported media type."},
-                status=400,
-            )
-
-        if not check_source_type(media_type, source):
-            return Response(
-                {
-                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
-                },
-                status=400,
-            )
-
-        try:
-            media_metadata = services.get_media_metadata(media_type, media_id, source)
-        except Exception as e:  # noqa: BLE001
-            return Response(
-                {"detail": f"{get_http_message(500)}", "errors": str(e)},
-                status=500,
-            )
-
-        recommendations = []
-        if (
-            "related" in media_metadata
-            and media_metadata["related"] is not None
-            and "recommendations" in media_metadata["related"]
-        ):
-            recommendations = media_metadata["related"]["recommendations"]
-
-        return Response(recommendations, status=200)
-
-
 # /api/v1/media/[media_type]/[source]/[media_id]/changes_history/
 class MediaChangesHistoryView(drf_views.APIView):
     """Media changes history view."""
@@ -711,6 +669,57 @@ class MediaChangesHistoryView(drf_views.APIView):
             serializer_class=HistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/lists/
+class MediaAddToListView(drf_views.APIView):  # noqa: D101
+    def post(self, request, media_type, source, media_id):  # noqa: ARG002, D102
+        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+
+    def delete(self, request, media_type, source, media_id):  # noqa: ARG002, D102
+        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/recommendations/
+class MediaRecommendationsView(drf_views.APIView):
+    """Media recommendations view."""
+
+    serializer_class = MediaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, _, media_type, source, media_id):
+        """Retrieve recommendations for a specific media."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            media_metadata = services.get_media_metadata(media_type, media_id, source)
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        recommendations = []
+        if (
+            "related" in media_metadata
+            and media_metadata["related"] is not None
+            and "recommendations" in media_metadata["related"]
+        ):
+            recommendations = media_metadata["related"]["recommendations"]
+
+        return Response(recommendations, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/seasons/
@@ -844,15 +853,6 @@ class MediaSyncView(drf_views.APIView):
                 {"detail": f"{get_http_message(500)}", "errors": str(e)},
                 status=500,
             )
-
-
-# /api/v1/media/[media_type]/[source]/[media_id]/lists/
-class MediaAddToListView(drf_views.APIView):  # noqa: D101
-    def post(self, request, media_type, source, media_id):  # noqa: ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
-
-    def delete(self, request, media_type, source, media_id):  # noqa: ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/
@@ -990,6 +990,65 @@ class MediaSeasonDetailView(drf_views.APIView):
         return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/changes_history/
+class MediaSeasonChangesHistoryView(drf_views.APIView):
+    """Changes history season view."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, media_id, season_number):
+        """Retrieve changes history timeline entries for a specific season of a tv serie."""
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        user_medias = BasicMedia.objects.filter_media(
+            request.user,
+            media_id,
+            "season",
+            source,
+            season_number=season_number,
+        )
+
+        entries = get_changes_history_entries(user_medias, media_type)
+
+        paginated_data = paginate_data(
+            request,
+            entries,
+            limit,
+            offset,
+        )
+        paginated_data["results"] = serialize_data(
+            paginated_data["results"],
+            many=True,
+            context={"request": request, "media_type": media_type},
+            serializer_class=HistoryEntrySerializer,
+        )
+        return Response(paginated_data, status=200)
+
+
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/episodes/
 class MediaSeasonEpisodesView(drf_views.APIView):
     """Season episodes view."""
@@ -1049,65 +1108,6 @@ class MediaSeasonEpisodesView(drf_views.APIView):
             serializer_class=EpisodeSerializer,
         )
         return Response(paginated, status=200)
-
-
-# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/changes_history/
-class MediaSeasonChangesHistoryView(drf_views.APIView):
-    """Changes history season view."""
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, media_type, source, media_id, season_number):
-        """Retrieve changes history timeline entries for a specific season of a tv serie."""
-        limit, offset, err = parse_limit_offset(request)
-        if err:
-            return err
-
-        if not check_valid_type(media_type):
-            return Response(
-                {"detail": f"{get_http_message(400)} Unsupported media type."},
-                status=400,
-            )
-
-        if media_type != MediaTypes.TV.value:
-            return Response(
-                {
-                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
-                },
-                status=400,
-            )
-
-        if not check_source_type(media_type, source):
-            return Response(
-                {
-                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
-                },
-                status=400,
-            )
-
-        user_medias = BasicMedia.objects.filter_media(
-            request.user,
-            media_id,
-            "season",
-            source,
-            season_number=season_number,
-        )
-
-        entries = get_changes_history_entries(user_medias, media_type)
-
-        paginated_data = paginate_data(
-            request,
-            entries,
-            limit,
-            offset,
-        )
-        paginated_data["results"] = serialize_data(
-            paginated_data["results"],
-            many=True,
-            context={"request": request, "media_type": media_type},
-            serializer_class=HistoryEntrySerializer,
-        )
-        return Response(paginated_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/sync/
