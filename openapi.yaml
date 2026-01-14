@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.13
+  version: 0.0.14
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -13,6 +13,7 @@ tags:
   - name: calendar
   - name: health
   - name: history
+  - name: info
   - name: lists
   - name: media
   - name: search
@@ -222,6 +223,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /api/v1/info/:
+    get:
+      tags:
+        - info
+      summary: Get application information
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfoResponse"
   /api/v1/lists/:
     get:
       tags:
@@ -2444,6 +2458,31 @@ components:
                 type: string
                 nullable: true
                 description: Error message if the health check failed
+    InfoResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Application version
+        debug:
+          type: boolean
+          description: Whether the application is in debug mode
+        frontend_url:
+          type: string
+          format: uri
+          description: Frontend URL
+        language:
+          type: string
+          description: Application language
+        timezone:
+          type: string
+          description: Application timezone
+        admin_enabled:
+          type: boolean
+          description: Whether admin interface is enabled
+        track_time:
+          type: boolean
+          description: Whether time tracking is enabled
     Item:
       type: object
       properties:

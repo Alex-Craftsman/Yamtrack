@@ -53,6 +53,7 @@ from .serializers import (
     EpisodeSerializer,
     HealthResponseSerializer,
     HistorySerializer,
+    InfoSerializer,
     MediaSerializer,
     SeasonSerializer,
     TimelineItemSerializer,
@@ -226,6 +227,23 @@ class HealthView(CheckMixin, drf_views.APIView):
         )
         status_code = 500 if errors else 200
         return Response(response_data, status=status_code)
+
+
+# /api/v1/info/
+class InfoView(drf_views.APIView):
+    """Info endpoint."""
+
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        """Get application information."""
+        info_data = {}
+        response_data = serialize_data(
+            info_data,
+            serializer_class=InfoSerializer,
+        )
+        return Response(response_data, status=200)
 
 
 # /api/v1/lists/

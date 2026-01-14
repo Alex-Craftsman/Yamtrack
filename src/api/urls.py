@@ -15,6 +15,7 @@ urlpatterns = [
         name="api_media_changes_history_detail",
     ),
     re_path(r"^health/?$", views.HealthView.as_view(), name="api_health"),
+    re_path(r"^info/?$", views.InfoView.as_view(), name="api_info"),
     re_path(r"^lists/?$", views.ListsView.as_view(), name="api_lists"),
     re_path(
         r"^lists/(?P<list_id>\d+)/?$",

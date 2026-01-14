@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils.timezone import now
 from rest_framework import serializers
 
@@ -374,7 +375,25 @@ class HistorySerializer(serializers.Serializer):
             "id": getattr(instance, "history_id", None),
             "item_id": item_id,
             "timestamp": getattr(instance, "history_date", None),
-            "changes": changes,
+            "notes": instance.notes
+            if hasattr(instance, "notes") and instance.notes is not None
+            else None,
+        }
+
+
+class InfoSerializer(serializers.Serializer):
+    """Serializer for the info endpoint."""
+
+    def to_representation(self, instance):
+        """Transform to representation."""
+        return {
+            "version": settings.VERSION,
+            "debug": settings.DEBUG,
+            "frontend_url": settings.BASE_URL or "http://localhost:8000",
+            "language": settings.LANGUAGE_CODE,
+            "timezone": settings.TIME_ZONE,
+            "admin_enabled": settings.ADMIN_ENABLED,
+            "track_time": settings.TRACK_TIME,
         }
 
 
