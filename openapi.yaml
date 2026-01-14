@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Yamtrack API
-  version: 0.0.12
+  version: 0.0.13
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -11,6 +11,7 @@ security:
   - bearerAuth: []
 tags:
   - name: calendar
+  - name: health
   - name: history
   - name: lists
   - name: media
@@ -203,6 +204,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/health/:
+    get:
+      tags:
+        - health
+      summary: Health check endpoint
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
   /api/v1/lists/:
     get:
       tags:
@@ -2008,6 +2027,42 @@ components:
           format: date-time
         notification_sent:
           type: boolean
+    ChangesHistoryRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The changes history change id
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+          description: The id of the media item
+        timestamp:
+          type: string
+          format: date-time
+        changes:
+          type: array
+          description: List of changes done at specified timestamp
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: The media field changed
+                enum:
+                  - end_date
+                  - notes
+                  - progress
+                  - score
+                  - start_date
+                  - status
+              old_value:
+                type: string
+                description: The value before the change
+                nullable: true
+              new_value:
+                type: string
+                description: The value after the change
+                nullable: true
     ComicDetails:
       type: object
       properties:
@@ -2361,42 +2416,34 @@ components:
         profile_path:
           type: string
           nullable: true
-    ChangesHistoryRecord:
+    HealthResponse:
       type: object
       properties:
-        id:
-          type: integer
-          description: The changes history change id
-        item_id:
-          $ref: "#/components/schemas/ItemId"
-          description: The id of the media item
+        status:
+          type: string
+          enum:
+            - "ok"
+            - "unavailable"
+          description: Overall health status
         timestamp:
           type: string
           format: date-time
-        changes:
-          type: array
-          description: List of changes done at specified timestamp
-          items:
+          description: Timestamp of the health check
+        checks:
+          type: object
+          description: Individual component health checks
+          additionalProperties:
             type: object
             properties:
-              field:
+              status:
                 type: string
-                description: The media field changed
                 enum:
-                  - end_date
-                  - notes
-                  - progress
-                  - score
-                  - start_date
-                  - status
-              old_value:
+                  - "ok"
+                  - "error"
+              error:
                 type: string
-                description: The value before the change
                 nullable: true
-              new_value:
-                type: string
-                description: The value after the change
-                nullable: true
+                description: Error message if the health check failed
     Item:
       type: object
       properties:

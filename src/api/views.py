@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import IntegrityError
 from django.utils.timezone import datetime, localdate, make_aware
+from health_check.mixins import CheckMixin
 from rest_framework import permissions
 from rest_framework import views as drf_views
 from rest_framework.response import Response
@@ -50,7 +51,8 @@ from .serializers import (
     CompleteEpisodeSerializer,
     CompleteMediaSerializer,
     EpisodeSerializer,
-    HistoryEntrySerializer,
+    HealthResponseSerializer,
+    HistorySerializer,
     MediaSerializer,
     SeasonSerializer,
     TimelineItemSerializer,
@@ -201,6 +203,29 @@ class MediaTypeChangesHistoryDetailView(drf_views.APIView):
                 },
                 status=404,
             )
+
+
+# /api/v1/health/
+class HealthView(CheckMixin, drf_views.APIView):
+    """Health check view."""
+
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request, *args, **kwargs):
+        """Check API health status."""
+        errors = self.errors
+        plugins = self.plugins
+        health_data = {
+            "plugins": plugins,
+            "errors": errors,
+        }
+        response_data = serialize_data(
+            health_data,
+            serializer_class=HealthResponseSerializer,
+        )
+        status_code = 500 if errors else 200
+        return Response(response_data, status=status_code)
 
 
 # /api/v1/lists/

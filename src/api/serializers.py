@@ -1,3 +1,4 @@
+from django.utils.timezone import now
 from rest_framework import serializers
 
 from app.models import (
@@ -307,41 +308,68 @@ class EventSerializer(serializers.ModelSerializer):
         return data
 
 
-class HistoryEntrySerializer(serializers.Serializer):
-    """Serializer that builds a change-based history entry."""
+class HealthResponseSerializer(serializers.Serializer):
+    """Serializer for health check response."""
 
     def to_representation(self, instance):
-        """Build history entry with changes."""
-        media_type = None
-        if self.context:
-            media_type = self.context.get("media_type")
+        """Transform reports from health-check library to json."""
+        plugins = instance.get("plugins", {})
+        errors = instance.get("errors", [])
 
-        prev = getattr(instance, "prev_record", None)
-        if prev is not None:
-            changes = get_changes_from_diff(instance, prev, media_type)
-        else:
-            changes = get_changes_from_new_record(instance, media_type)
+        checks = {}
+        for plugin_identifier, plugin in plugins.items():
+            plugin_has_errors = bool(plugin.errors)
 
-        for change in changes:
-            if change.get("field") == "status":
+            checks[plugin_identifier] = {
+                "status": "error" if plugin_has_errors else "ok",
+                "error": plugin.pretty_status() if plugin_has_errors else None,
+            }
 
-                class TempObj:
-                    def __init__(self, status_value):
-                        self.status = status_value
+        overall_status = "unavailable" if errors else "ok"
 
-                status_field = StatusField()
-                if change.get("old_value") is not None:
-                    change["old_value"] = status_field.to_representation(
-                        TempObj(change["old_value"]),
-                    )
-                if change.get("new_value") is not None:
-                    change["new_value"] = status_field.to_representation(
-                        TempObj(change["new_value"]),
-                    )
+        return {
+            "status": overall_status,
+            "timestamp": now().isoformat(),
+            "checks": checks,
+        }
 
-        item_obj = getattr(instance, "item_obj", None)
-        item_id = build_item_id(item_obj) if item_obj is not None else None
 
+class HistorySerializer(serializers.Serializer):
+    """Serializer for watch history entries."""
+
+    # TODO: Progress for single "progress" medias should be as status
+
+    def to_representation(self, instance):
+        """Transform a user media instance into a watch history entry."""
+        # For Episode instances, use simplified structure
+        if isinstance(instance, Episode):
+            consumption_index = (
+                self.context.get("consumption_index") if self.context else None
+            )
+            return {
+                "consumption_id": consumption_index,
+                "database_id": instance.id,
+                "created": instance.created_at
+                if hasattr(instance, "created_at")
+                else None,
+                "score": None,
+                "progress": 1 if bool(instance) else 0,
+                "progressed_at": instance.created_at
+                if hasattr(instance, "created_at")
+                else None,
+                "status": 3 if bool(instance) else None,
+                "start_date": instance.created_at
+                if hasattr(instance, "created_at")
+                else None,
+                "end_date": instance.end_date
+                if hasattr(instance, "end_date")
+                else None,
+                "notes": "",
+            }
+        status = StatusField().to_representation(instance)
+        consumption_index = (
+            self.context.get("consumption_index") if self.context else None
+        )
         return {
             "id": getattr(instance, "history_id", None),
             "item_id": item_id,
