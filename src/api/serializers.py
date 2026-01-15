@@ -22,7 +22,13 @@ from .changes_history_processor import (
     get_changes_from_diff,
     get_changes_from_new_record,
 )
-from .helpers import build_item_id, build_parent_id, get_http_message, get_media_status
+from .helpers import (
+    build_item_id,
+    build_parent_id,
+    get_http_message,
+    get_media_status,
+    get_progress_from_status,
+)
 
 
 class ItemIdField(serializers.Field):
@@ -54,6 +60,49 @@ class ItemSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ChangesHistoryEntrySerializer(serializers.Serializer):
+    """Serializer that builds a change-based history entry."""
+
+    def to_representation(self, instance):
+        """Build history entry with changes."""
+        media_type = None
+        if self.context:
+            media_type = self.context.get("media_type")
+
+        prev = getattr(instance, "prev_record", None)
+        if prev is not None:
+            changes = get_changes_from_diff(instance, prev, media_type)
+        else:
+            changes = get_changes_from_new_record(instance, media_type)
+
+        for change in changes:
+            if change.get("field") == "status":
+
+                class TempObj:
+                    def __init__(self, status_value):
+                        self.status = status_value
+
+                status_field = StatusField()
+                if change.get("old_value") is not None:
+                    change["old_value"] = status_field.to_representation(
+                        TempObj(change["old_value"]),
+                    )
+                if change.get("new_value") is not None:
+                    change["new_value"] = status_field.to_representation(
+                        TempObj(change["new_value"]),
+                    )
+
+        item_obj = getattr(instance, "item_obj", None)
+        item_id = build_item_id(item_obj) if item_obj is not None else None
+
+        return {
+            "id": getattr(instance, "history_id", None),
+            "item_id": item_id,
+            "timestamp": getattr(instance, "history_date", None),
+            "changes": changes,
+        }
+
+
 class CompleteEpisodeSerializer(serializers.Serializer):
     """Serializer that builds a CompleteEpisode response."""
 
@@ -82,19 +131,14 @@ class CompleteEpisodeSerializer(serializers.Serializer):
             else None
         )
 
-        watches_number = len(user_medias)
-        watches = [
-            {
-                "created": user_media.created_at,
-                "score": None,
-                "progress": 1 if bool(user_media) else 0,
-                "progressed_at": user_media.created_at,
-                "status": 3 if bool(user_media) else None,
-                "start_date": user_media.created_at,
-                "end_date": user_media.created_at,
-                "notes": "",
-            }
-            for user_media in user_medias
+        consumptions_number = len(user_medias)
+        consumptions = [
+            serialize_data(
+                media,
+                context={"consumption_index": consumptions_number - 1 - idx},
+                serializer_class=HistorySerializer,
+            )
+            for idx, media in enumerate(user_medias)
         ]
 
         return {
@@ -121,9 +165,9 @@ class CompleteEpisodeSerializer(serializers.Serializer):
             "related": {},
             "item_id": ItemIdField().to_representation(temp_episode),
             "parent_id": ParentIdField().to_representation(temp_episode),
-            "tracked": watches_number > 0,
-            "watches_number": watches_number,
-            "watches": watches,
+            "tracked": consumptions_number > 0,
+            "consumptions_number": consumptions_number,
+            "consumptions": consumptions,
         }
 
 
@@ -196,31 +240,15 @@ class CompleteMediaSerializer(serializers.Serializer):
             details["last_issue_id"] = media_metadata.pop("last_issue_id")
         related = media_metadata.get("related", {})
 
-        watches_number = len(user_medias)
-        watches = [
-            {
-                "created": user_media.created_at
-                if hasattr(user_media, "created_at")
-                else None,
-                "score": float(user_media.score)
-                if hasattr(user_media, "score")
-                else None,
-                "progress": int(user_media.progress)
-                if hasattr(user_media, "progress")
-                else None,
-                "progressed_at": user_media.progressed_at
-                if hasattr(user_media, "progressed_at")
-                else None,
-                "status": StatusField().to_representation(user_media),
-                "start_date": user_media.start_date
-                if hasattr(user_media, "start_date")
-                else None,
-                "end_date": user_media.end_date
-                if hasattr(user_media, "end_date")
-                else None,
-                "notes": user_media.notes if hasattr(user_media, "notes") else None,
-            }
-            for user_media in user_medias
+        consumptions_number = len(user_medias)
+        # Enumerate in reverse order so first item (newest) gets highest index
+        consumptions = [
+            serialize_data(
+                media,
+                context={"consumption_index": consumptions_number - 1 - idx},
+                serializer_class=HistorySerializer,
+            )
+            for idx, media in enumerate(user_medias)
         ]
 
         # TODO: Check why some informations take a while to update after a change
@@ -232,7 +260,9 @@ class CompleteMediaSerializer(serializers.Serializer):
             "media_type": media_metadata.get("media_type"),
             "title": media_metadata.pop("season_title", None)
             or media_metadata.get("title"),
-            "max_progress": int(media_metadata.get("max_progress")),
+            "max_progress": int(media_metadata.get("max_progress"))
+            if media_metadata.get("max_progress") is not None
+            else 1,
             "image": media_metadata.get("image"),
             "synopsis": media_metadata.get("synopsis"),
             "genres": media_metadata.get("genres"),
@@ -242,9 +272,9 @@ class CompleteMediaSerializer(serializers.Serializer):
             "related": related,
             "item_id": ItemIdField().to_representation(temp_media),
             "parent_id": ParentIdField().to_representation(temp_media),
-            "tracked": watches_number > 0,
-            "watches_number": watches_number,
-            "watches": watches,
+            "tracked": consumptions_number > 0,
+            "consumptions_number": consumptions_number,
+            "consumptions": consumptions,
         }
 
 
@@ -338,8 +368,6 @@ class HealthResponseSerializer(serializers.Serializer):
 class HistorySerializer(serializers.Serializer):
     """Serializer for watch history entries."""
 
-    # TODO: Progress for single "progress" medias should be as status
-
     def to_representation(self, instance):
         """Transform a user media instance into a watch history entry."""
         # For Episode instances, use simplified structure
@@ -372,9 +400,25 @@ class HistorySerializer(serializers.Serializer):
             self.context.get("consumption_index") if self.context else None
         )
         return {
-            "id": getattr(instance, "history_id", None),
-            "item_id": item_id,
-            "timestamp": getattr(instance, "history_date", None),
+            "consumption_id": consumption_index,
+            "database_id": instance.id,
+            "created": instance.created_at
+            if hasattr(instance, "created_at") and instance.created_at is not None
+            else None,
+            "score": float(instance.score)
+            if hasattr(instance, "score") and instance.score is not None
+            else None,
+            "progress": get_progress_from_status(status),
+            "progressed_at": instance.progressed_at
+            if hasattr(instance, "progressed_at") and instance.progressed_at is not None
+            else None,
+            "status": status,
+            "start_date": instance.start_date
+            if hasattr(instance, "start_date") and instance.start_date is not None
+            else None,
+            "end_date": instance.end_date
+            if hasattr(instance, "end_date") and instance.end_date is not None
+            else None,
             "notes": instance.notes
             if hasattr(instance, "notes") and instance.notes is not None
             else None,

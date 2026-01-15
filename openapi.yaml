@@ -599,7 +599,7 @@ paths:
     delete:
       tags:
         - media
-      summary: Delete a tracked media item
+      summary: Delete a tracked media item and all its consumptions
       parameters:
         - in: path
           name: media_type
@@ -646,7 +646,7 @@ paths:
     get:
       tags:
         - media
-      summary: Retrieve a tracked media item by media type, source and media id
+      summary: Retrieve a tracked media item
       parameters:
         - in: path
           name: media_type
@@ -697,7 +697,7 @@ paths:
     patch:
       tags:
         - media
-      summary: Edit user fields (score, status, progress, dates)
+      summary: Edit LAST CONSUMPTION of a tracked media item
       parameters:
         - in: path
           name: media_type
@@ -719,7 +719,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/UpdateMedia"
       responses:
         "200":
           description: Updated
@@ -854,7 +854,183 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedWatchHistory"
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/history/{consumption_id}/:
+    delete:
+      tags:
+        - history
+        - media
+      summary: Delete a specific watch history record by media type, source, media id and watch id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - history
+        - media
+      summary: Retrieve a specific watch history record by media type, source, media id and watch id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - history
+        - media
+      summary: Edit a specific consumption history record of a tracked media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMedia"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
         "400":
           description: Bad Request
           content:
@@ -1161,7 +1337,7 @@ paths:
     delete:
       tags:
         - media
-      summary: Delete a tracked media item
+      summary: Delete a tracked season and all of its consumptions
       parameters:
         - in: path
           name: media_type
@@ -1213,7 +1389,7 @@ paths:
     get:
       tags:
         - media
-      summary: Retrieve a tracked season item by media type, source, media id and season number
+      summary: Retrieve a tracked season
       parameters:
         - in: path
           name: media_type
@@ -1266,11 +1442,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/episodes/:
-    get:
+    patch:
       tags:
         - media
-      summary: Retrieve tracked episodes for a season item by media type, source, media id and season number
+      summary: Edit LAST CONSUMPTION of a tracked season
       parameters:
         - in: path
           name: media_type
@@ -1292,27 +1467,15 @@ paths:
           required: true
           schema:
             type: integer
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            minimum: 1
-            default: 20
-          description: "Maximum number of items to return (default: 20)"
-        - in: query
-          name: offset
-          schema:
-            type: integer
-            minimum: 0
-            default: 0
-          description: "Offset for pagination (default: 0)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSeason"
       responses:
         "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PaginatedEpisodes"
+          description: Updated
         "400":
           description: Bad Request
           content:
@@ -1408,6 +1571,77 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/episodes/:
+    get:
+      tags:
+        - media
+      summary: Retrieve tracked episodes for a season item by media type, source, media id and season number
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedEpisodes"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/history/:
     get:
       tags:
@@ -1454,7 +1688,198 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedWatchHistory"
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/history/{consumption_id}/:
+    delete:
+      tags:
+        - history
+        - media
+      summary: Delete a specific watch history record by media type, source, media id, season number and watch id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - history
+        - media
+      summary: Retrieve a specific watch history record by media type, source, media id, season number and watch id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - history
+        - media
+      summary: Edit a specific consumption history record of a tracked season
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSeason"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
         "400":
           description: Bad Request
           content:
@@ -1657,6 +2082,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - media
+      summary: Edit LAST CONSUMPTION of a tracked episode
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEpisode"
+      responses:
+        "200":
+          description: Updated
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/changes_history/:
     get:
       tags:
@@ -1784,7 +2272,213 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedWatchHistory"
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/history/{consumption_id}/:
+    delete:
+      tags:
+        - history
+        - media
+      summary: Delete a specific consumption history record
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - history
+        - media
+      summary: Retrieve a specific consumption history record
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - history
+        - media
+      summary: Edit a specific consumption history record of a tracked episode
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEpisode"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
         "400":
           description: Bad Request
           content:
@@ -2181,13 +2875,50 @@ components:
         tracked:
           type: boolean
           description: If the current media is being tracked by Yamtrack
-        watches_number:
+        consumptions_number:
           type: integer
           description: Number of times the media has been watched/tracked
-        watches:
+        consumptions:
           type: array
           items:
-            $ref: "#/components/schemas/WatchedInfos"
+            $ref: "#/components/schemas/ConsumptionInfos"
+    ConsumptionInfos:
+      type: object
+      properties:
+        consumption_id:
+          type: integer
+          description: The sequential consumption number for this specific media (e.g., 1st watch, 2nd watch, etc.)
+        database_id:
+          type: integer
+          description: The unique database identifier for this record
+        created:
+          type: string
+          format: date-time
+          nullable: true
+        score:
+          type: number
+          format: float
+          nullable: true
+        progress:
+          type: integer
+          nullable: true
+        progressed_at:
+          type: string
+          format: timestamp
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
     CreateMedia:
       description: |
         Unified payload for creating media items. Use `source: manual` for manual items (omit `media_id`) or
@@ -2679,7 +3410,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Season"
-    PaginatedWatchHistory:
+    PaginatedConsumptionHistory:
       type: object
       properties:
         pagination:
@@ -2687,7 +3418,7 @@ components:
         results:
           type: array
           items:
-            $ref: "#/components/schemas/WatchedInfos"
+            $ref: "#/components/schemas/ConsumptionInfos"
     Pagination:
       type: object
       properties:
@@ -2964,7 +3695,7 @@ components:
           description: Status distribution pie chart
         timeline:
           type: object
-          description: Timeline of media consumption by month
+          description: Timeline of media consumptions by month
     TVDetails:
       type: object
       properties:
@@ -3014,26 +3745,67 @@ components:
           description: Related seasons
           items:
             $ref: "#/components/schemas/Season"
-    WatchedInfos:
+    UpdateMedia:
+      description: |
+        Unified payload for updating media items.
+        All fields are optional and only provided fields will be updated.
       type: object
       properties:
-        created:
-          type: string
-          format: date-time
-          nullable: true
         score:
           type: number
           format: float
           nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
         progress:
           type: integer
           nullable: true
-        progressed_at:
+        start_date:
           type: string
-          format: timestamp
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateEpisode:
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
           nullable: true
         status:
           $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateSeason:
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
         start_date:
           type: string
           format: date-time

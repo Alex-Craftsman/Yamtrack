@@ -48,6 +48,7 @@ from .helpers import (
     try_parse_date,
 )
 from .serializers import (
+    ChangesHistoryEntrySerializer,
     CompleteEpisodeSerializer,
     CompleteMediaSerializer,
     EpisodeSerializer,
@@ -173,7 +174,7 @@ class MediaTypeChangesHistoryDetailView(drf_views.APIView):
             serialized_data = serialize_data(
                 record,
                 context={"media_type": media_type},
-                serializer_class=HistoryEntrySerializer,
+                serializer_class=ChangesHistoryEntrySerializer,
             )
             return Response(serialized_data, status=200)
         except Exception as e:
@@ -366,7 +367,7 @@ class MediaTypeListView(drf_views.APIView):
 
     def get(self, request, media_type):
         """Retrieve the list of media of a specific media type."""
-        # TODO: handle multiple watches of the same media item
+        # TODO: handle multiple consumptions of the same media item
         user = request.user
         status = request.GET.get("status", "")
         search = request.GET.get("search", "")
@@ -559,7 +560,7 @@ class MediaDetailView(drf_views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def delete(self, request, media_type, source, media_id):
-        """Delete a tracked media item for the authenticated user."""
+        """Delete a tracked media item and all its consumptions."""
         user = request.user
 
         if not check_valid_type(media_type):
@@ -595,7 +596,6 @@ class MediaDetailView(drf_views.APIView):
                 status=404,
             )
 
-        # TODO: Handle better rewatches
         for media in user_medias:
             media.delete()
 
@@ -709,9 +709,169 @@ class MediaChangesHistoryView(drf_views.APIView):
             paginated_data["results"],
             many=True,
             context={"media_type": media_type},
-            serializer_class=HistoryEntrySerializer,
+            serializer_class=ChangesHistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/history/
+class MediaConsumptionHistoryView(drf_views.APIView):
+    """Media consumption history view."""
+
+    serializer_class = HistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, media_id):
+        """Retrieve the history timeline for a specific media."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",  # noqa: E501
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                media_type,
+                source,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        consumptions_number = len(user_medias)
+        consumptions = [
+            serialize_data(
+                media,
+                context={"consumption_index": consumptions_number - 1 - idx},
+                serializer_class=HistorySerializer,
+            )
+            for idx, media in enumerate(user_medias)
+        ]
+        return Response(consumptions, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/history/[consumption_id]/
+class MediaConsumptionEntryDetailView(drf_views.APIView):
+    """Media consumption history entry detail view."""
+
+    serializer_class = HistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, media_type, source, media_id, consumption_id):
+        """Delete a specific consumption history entry for a specific media."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",  # noqa: E501
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                media_type,
+                source,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        try:
+            consumption_index = len(user_medias) - 1 - int(consumption_id)
+        except ValueError:
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        if consumption_index < 0 or consumption_index >= len(user_medias):
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        media = user_medias[consumption_index]
+        media.delete()
+
+        return Response(status=204)
+
+    def get(self, request, media_type, source, media_id, consumption_id):
+        """Retrieve a specific consumption history entry for a specific media."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",  # noqa: E501
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                media_type,
+                source,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        try:
+            consumption_index = int(consumption_id)
+        except ValueError:
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        if consumption_index < 0 or consumption_index >= len(user_medias):
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        media = user_medias[consumption_index]
+
+        serialized_data = serialize_data(
+            media,
+            context={"consumption_index": consumption_index},
+            serializer_class=HistorySerializer,
+        )
+        return Response(serialized_data, status=200)
+
+    def patch(self, request, media_type, source, media_id, consumption_id):
+        """Update a specific consumption history entry for a specific media."""
+        return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/lists/
@@ -951,7 +1111,7 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=404,
             )
 
-        # TODO: Handle better rewatches
+        # TODO: Handle better reconsumptions
         for media in user_medias:
             media.delete()
 
@@ -1087,7 +1247,7 @@ class MediaSeasonChangesHistoryView(drf_views.APIView):
             paginated_data["results"],
             many=True,
             context={"request": request, "media_type": media_type},
-            serializer_class=HistoryEntrySerializer,
+            serializer_class=ChangesHistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
 
@@ -1151,6 +1311,209 @@ class MediaSeasonEpisodesView(drf_views.APIView):
             serializer_class=EpisodeSerializer,
         )
         return Response(paginated, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/
+class MediaSeasonConsumptionHistoryView(drf_views.APIView):
+    """Season consumption history view."""
+
+    serializer_class = HistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, media_id, season_number):
+        """Retrieve the history timeline for a specific season of a tv serie."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",  # noqa: E501
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                "season",
+                source,
+                season_number=season_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        consumptions_number = len(user_medias)
+        consumptions = [
+            serialize_data(
+                media,
+                context={"consumption_index": consumptions_number - 1 - idx},
+                serializer_class=HistorySerializer,
+            )
+            for idx, media in enumerate(user_medias)
+        ]
+        return Response(consumptions, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/[consumption_id]/
+class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
+    """Season consumption history entry detail view."""
+
+    serializer_class = HistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(
+        self,
+        request,
+        media_type,
+        source,
+        media_id,
+        season_number,
+        consumption_id,
+    ):
+        """Delete a specific consumption history entry for a specific season of a tv serie."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",  # noqa: E501
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                "season",
+                source,
+                season_number=season_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        try:
+            consumption_index = len(user_medias) - 1 - int(consumption_id)
+        except ValueError:
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        if consumption_index < 0 or consumption_index >= len(user_medias):
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        media = user_medias[consumption_index]
+        media.delete()
+
+        return Response(status=204)
+
+    def get(self, request, media_type, source, media_id, season_number, consumption_id):
+        """Retrieve a specific consumption history entry for a specific season of a tv serie."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",  # noqa: E501
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                "season",
+                source,
+                season_number=season_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        try:
+            consumption_index = int(consumption_id)
+        except ValueError:
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        if consumption_index < 0 or consumption_index >= len(user_medias):
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        media = user_medias[consumption_index]
+
+        serialized_data = serialize_data(
+            media,
+            context={"consumption_index": consumption_index},
+            serializer_class=HistorySerializer,
+        )
+        return Response(serialized_data, status=200)
+
+    def patch(
+        self,
+        request,
+        media_type,
+        source,
+        media_id,
+        season_number,
+        consumption_id,
+    ):
+        """Update a specific consumption history entry for a specific season of a tv serie."""
+        return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/sync/
@@ -1333,7 +1696,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
                 status=404,
             )
 
-        # TODO: Handle better rewatches
+        # TODO: Handle better reconsumptions
         for media in user_medias:
             media.delete()
 
@@ -1497,9 +1860,226 @@ class MediaEpisodeChangesHistoryView(drf_views.APIView):
             paginated_data["results"],
             many=True,
             context={"request": request, "media_type": media_type},
-            serializer_class=HistoryEntrySerializer,
+            serializer_class=ChangesHistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/
+class MediaEpisodeConsumptionHistoryView(drf_views.APIView):
+    """Episode consumption history view."""
+
+    serializer_class = HistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, media_type, source, media_id, season_number, episode_number):
+        """Retrieve the history timeline for a specific episode of a tv serie."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Episodes are supported only for 'tv' media type.",  # noqa: E501
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",  # noqa: E501
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                "episode",
+                source,
+                season_number=season_number,
+                episode_number=episode_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        consumptions_number = len(user_medias)
+        consumptions = [
+            serialize_data(
+                media,
+                context={"consumption_index": consumptions_number - 1 - idx},
+                serializer_class=HistorySerializer,
+            )
+            for idx, media in enumerate(user_medias)
+        ]
+        return Response(consumptions, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/[consumption_id]/
+class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
+    """Episode consumption history entry detail view."""
+
+    serializer_class = HistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(
+        self,
+        request,
+        media_type,
+        source,
+        media_id,
+        season_number,
+        episode_number,
+        consumption_id,
+    ):
+        """Delete a specific consumption history entry for a specific episode."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Episodes are supported only for 'tv' media type.",  # noqa: E501
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",  # noqa: E501
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                "episode",
+                source,
+                season_number=season_number,
+                episode_number=episode_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        try:
+            consumption_index = len(user_medias) - 1 - int(consumption_id)
+        except ValueError:
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        if consumption_index < 0 or consumption_index >= len(user_medias):
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        media = user_medias[consumption_index]
+        media.delete()
+
+        return Response(status=204)
+
+    def get(
+        self,
+        request,
+        media_type,
+        source,
+        media_id,
+        season_number,
+        episode_number,
+        consumption_id,
+    ):
+        """Retrieve a specific consumption history entry for a specific episode."""
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Episodes are supported only for 'tv' media type.",  # noqa: E501
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",  # noqa: E501
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                "episode",
+                source,
+                season_number=season_number,
+                episode_number=episode_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        try:
+            consumption_index = int(consumption_id)
+        except ValueError:
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        if consumption_index < 0 or consumption_index >= len(user_medias):
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        media = user_medias[consumption_index]
+
+        serialized_data = serialize_data(
+            media,
+            context={"consumption_index": consumption_index},
+            serializer_class=HistorySerializer,
+        )
+        return Response(serialized_data, status=200)
+
+    def patch(
+        self,
+        request,
+        media_type,
+        source,
+        media_id,
+        season_number,
+        episode_number,
+        consumption_id,
+    ):
+        """Update a specific consumption history entry for a specific episode."""
+        return Response({"detail": f"{get_http_message(501)}"}, status=501)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/sync/

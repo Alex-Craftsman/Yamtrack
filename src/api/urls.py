@@ -2,6 +2,8 @@ from django.urls import re_path
 
 from . import views
 
+# TODO: regex patterns can be removed since APPEND_SLASH was activated
+
 urlpatterns = [
     re_path(r"^calendar/?$", views.CalendarView.as_view(), name="api_calendar"),
     re_path(
@@ -49,6 +51,16 @@ urlpatterns = [
         name="api_media_changes_history",
     ),
     re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/history/?$",
+        views.MediaConsumptionHistoryView.as_view(),
+        name="api_media_consumption_history",
+    ),
+    re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/history/(?P<consumption_id>\d+)/?$",
+        views.MediaConsumptionEntryDetailView.as_view(),
+        name="api_media_consumption_entry_detail",
+    ),
+    re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/lists/?$",
         views.MediaAddToListView.as_view(),
         name="api_media_add_to_list",
@@ -74,14 +86,24 @@ urlpatterns = [
         name="api_media_season_detail",
     ),
     re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/changes_history/?$",
+        views.MediaSeasonChangesHistoryView.as_view(),
+        name="api_media_season_changes_history",
+    ),
+    re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/episodes/?$",
         views.MediaSeasonEpisodesView.as_view(),
         name="api_media_season_episodes",
     ),
     re_path(
-        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/changes_history/?$",
-        views.MediaSeasonChangesHistoryView.as_view(),
-        name="api_media_season_changes_history",
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/history/?$",
+        views.MediaSeasonConsumptionHistoryView.as_view(),
+        name="api_media_season_consumption_history",
+    ),
+    re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/history/(?P<consumption_id>\d+)/?$",
+        views.MediaSeasonConsumptionEntryDetailView.as_view(),
+        name="api_media_season_consumption_entry_detail",
     ),
     re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/sync/?$",
@@ -97,6 +119,16 @@ urlpatterns = [
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/changes_history/?$",
         views.MediaEpisodeChangesHistoryView.as_view(),
         name="api_media_episode_changes_history",
+    ),
+    re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/history/?$",
+        views.MediaEpisodeConsumptionHistoryView.as_view(),
+        name="api_media_episode_consumption_history",
+    ),
+    re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/history/(?P<consumption_id>\d+)/?$",
+        views.MediaEpisodeConsumptionEntryDetailView.as_view(),
+        name="api_media_episode_consumption_entry_detail",
     ),
     re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/sync/?$",

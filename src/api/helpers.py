@@ -238,6 +238,13 @@ def get_media_status(status):
     return MEDIA_STATUS_MAP.get(status)
 
 
+def get_progress_from_status(status):
+    """Return the progress value based on the media status."""
+    if status == MEDIA_STATUS_MAP["Completed"]:
+        return 1
+    return 0
+
+
 def make_page_url(request, limit, new_offset):
     """Build a page URL with the given limit and offset."""
     params = {k: v for k, v in request.GET.items() if v is not None and v != ""}

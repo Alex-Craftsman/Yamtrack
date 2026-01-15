@@ -38,11 +38,7 @@ def get_changes_history_entry(media_type, history_id, user):
 
 
 def get_changes_history_entries(user_medias, media_type):
-    """Get all raw historical records for given user medias.
-
-    Returns a list of historical records with item_obj attached,
-    ready to be serialized by HistoryEntrySerializer.
-    """
+    """Get all raw historical records for given user medias."""
     entries = []
 
     for media in user_medias:
