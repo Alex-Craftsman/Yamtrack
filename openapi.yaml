@@ -1,7 +1,7 @@
-openapi: 3.0.0
+openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.14
+  version: 0.0.15
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -719,7 +719,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateMedia"
+              oneOf:
+                - $ref: "#/components/schemas/UpdateAnime"
+                - $ref: "#/components/schemas/UpdateBook"
+                - $ref: "#/components/schemas/UpdateComic"
+                - $ref: "#/components/schemas/UpdateGame"
+                - $ref: "#/components/schemas/UpdateManga"
+                - $ref: "#/components/schemas/UpdateMovie"
+                - $ref: "#/components/schemas/UpdateTV"
       responses:
         "200":
           description: Updated
@@ -1023,7 +1030,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateMedia"
+              oneOf:
+                - $ref: "#/components/schemas/UpdateAnime"
+                - $ref: "#/components/schemas/UpdateBook"
+                - $ref: "#/components/schemas/UpdateComic"
+                - $ref: "#/components/schemas/UpdateGame"
+                - $ref: "#/components/schemas/UpdateManga"
+                - $ref: "#/components/schemas/UpdateMovie"
+                - $ref: "#/components/schemas/UpdateTV"
       responses:
         "200":
           description: Updated
@@ -3745,10 +3759,9 @@ components:
           description: Related seasons
           items:
             $ref: "#/components/schemas/Season"
-    UpdateMedia:
+    UpdateAnime:
       description: |
-        Unified payload for updating media items.
-        All fields are optional and only provided fields will be updated.
+        Payload for updating anime. All fields can be modified.
       type: object
       properties:
         score:
@@ -3760,6 +3773,59 @@ components:
         progress:
           type: integer
           nullable: true
+          description: Episode number
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateBook:
+      description: |
+        Payload for updating books. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Page number
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateComic:
+      description: |
+        Payload for updating comics. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Page number or issue number
         start_date:
           type: string
           format: date-time
@@ -3772,6 +3838,18 @@ components:
           type: string
           nullable: true
     UpdateEpisode:
+      description: |
+        Payload for updating TV episodes.
+        Only end_date can be modified. Score, status, progress, start_date and notes are read-only.
+      type: object
+      properties:
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+    UpdateGame:
+      description: |
+        Payload for updating games. All fields can be modified.
       type: object
       properties:
         score:
@@ -3783,6 +3861,55 @@ components:
         progress:
           type: integer
           nullable: true
+          description: Time played in minutes
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateManga:
+      description: |
+        Payload for updating manga. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Chapter number
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateMovie:
+      description: |
+        Payload for updating movies.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
         start_date:
           type: string
           format: date-time
@@ -3795,6 +3922,10 @@ components:
           type: string
           nullable: true
     UpdateSeason:
+      description: |
+        Payload for updating TV seasons.
+        Only score, status, and notes can be modified.
+        progress, start_date, and end_date are read-only (calculated from episodes).
       type: object
       properties:
         score:
@@ -3803,17 +3934,23 @@ components:
           nullable: true
         status:
           $ref: "#/components/schemas/MediaStatus"
-        progress:
-          type: integer
-          nullable: true
-        start_date:
-          type: string
-          format: date-time
-          nullable: true
-        end_date:
-          type: string
-          format: date-time
-          nullable: true
         notes:
           type: string
           nullable: true
+    UpdateTV:
+      description: |
+        Payload for updating TV shows.
+        Only score, status, and notes can be modified.
+        start_date, end_date, and progress are read-only (calculated from seasons).
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        notes:
+          type: string
+          nullable: true
+    

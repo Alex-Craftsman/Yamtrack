@@ -46,6 +46,7 @@ from .helpers import (
     parse_sort_filter,
     parse_status_param,
     try_parse_date,
+    validate_body,
 )
 from .serializers import (
     ChangesHistoryEntrySerializer,
@@ -660,8 +661,94 @@ class MediaDetailView(drf_views.APIView):
         )
         return Response(serialized, status=200)
 
-    def patch(self, request, media_type, source, media_id):  # noqa: ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+    def patch(self, request, media_type, source, media_id):
+        """Update a tracked media item."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        body = request.data or {}
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                user,
+                media_id,
+                media_type,
+                source,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        if not user_medias:
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found or not tracked."},
+                status=404,
+            )
+
+        media = user_medias[0]
+
+        validated_body, error = validate_body(body)
+
+        if error:
+            return Response(
+                {"detail": f"{get_http_message(400)} {error}"},
+                status=400,
+            )
+
+        for field, value in validated_body.items():
+            if hasattr(media, field):
+                setattr(media, field, value)
+
+        try:
+            media.save()
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(400)}", "errors": str(e)},
+                status=400,
+            )
+
+        media.refresh_from_db()
+
+        try:
+            media_metadata = services.get_media_metadata(media_type, media_id, source)
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        if (
+            "related" in media_metadata
+            and media_metadata["related"] is not None
+            and "recommendations" in media_metadata["related"]
+        ):
+            media_metadata["related"].pop("recommendations")
+
+        data = {
+            "media_metadata": media_metadata,
+            "user_medias": user_medias,
+        }
+
+        serialized = serialize_data(
+            data,
+            serializer_class=CompleteMediaSerializer,
+        )
+        return Response(serialized, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/changes_history/

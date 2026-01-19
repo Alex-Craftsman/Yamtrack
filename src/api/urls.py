@@ -2,8 +2,6 @@ from django.urls import re_path
 
 from . import views
 
-# TODO: regex patterns can be removed since APPEND_SLASH was activated
-
 urlpatterns = [
     re_path(r"^calendar/?$", views.CalendarView.as_view(), name="api_calendar"),
     re_path(
