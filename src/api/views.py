@@ -702,7 +702,7 @@ class MediaDetailView(drf_views.APIView):
 
         media = user_medias[0]
 
-        validated_body, error = validate_body(body)
+        validated_body, error = validate_body(body, media_type)
 
         if error:
             return Response(
@@ -958,7 +958,78 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
 
     def patch(self, request, media_type, source, media_id, consumption_id):
         """Update a specific consumption history entry for a specific media."""
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                media_type,
+                source,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        try:
+            consumption_index = int(consumption_id)
+        except ValueError:
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        if consumption_index < 0 or consumption_index >= len(user_medias):
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        media = user_medias[consumption_index]
+        body = request.data or {}
+
+        validated_body, error = validate_body(body, media_type)
+
+        if error:
+            return Response(
+                {"detail": f"{get_http_message(400)} {error}"},
+                status=400,
+            )
+
+        for field, value in validated_body.items():
+            if hasattr(media, field):
+                setattr(media, field, value)
+
+        try:
+            media.save()
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(400)}", "errors": str(e)},
+                status=400,
+            )
+
+        media.refresh_from_db()
+
+        serialized_data = serialize_data(
+            media,
+            context={"consumption_index": consumption_index},
+            serializer_class=HistorySerializer,
+        )
+        return Response(serialized_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/lists/
@@ -1276,8 +1347,101 @@ class MediaSeasonDetailView(drf_views.APIView):
         )
         return Response(serialized, status=200)
 
-    def patch(self, request, media_type, source, media_id, season_number):  # noqa: ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+    def patch(self, request, media_type, source, media_id, season_number):
+        """Update a tracked season item."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        body = request.data or {}
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                user,
+                media_id,
+                "season",
+                source,
+                season_number=season_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        if not user_medias:
+            return Response(
+                {"detail": f"{get_http_message(404)} Season not found or not tracked."},
+                status=404,
+            )
+
+        media = user_medias[0]
+
+        validated_body, error = validate_body(body, "season")
+
+        if error:
+            return Response(
+                {"detail": f"{get_http_message(400)} {error}"},
+                status=400,
+            )
+
+        for field, value in validated_body.items():
+            if hasattr(media, field):
+                setattr(media, field, value)
+
+        try:
+            media.save()
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(400)}", "errors": str(e)},
+                status=400,
+            )
+
+        media.refresh_from_db()
+
+        try:
+            media_metadata = services.get_media_metadata(
+                "season",
+                media_id,
+                source,
+                [season_number],
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        data = {
+            "media_metadata": media_metadata,
+            "user_medias": user_medias,
+        }
+
+        serialized = serialize_data(
+            data,
+            serializer_class=CompleteMediaSerializer,
+        )
+        return Response(serialized, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/changes_history/
@@ -1600,7 +1764,87 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
         consumption_id,
     ):
         """Update a specific consumption history entry for a specific season of a tv serie."""
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                "season",
+                source,
+                season_number=season_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        try:
+            consumption_index = int(consumption_id)
+        except ValueError:
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        if consumption_index < 0 or consumption_index >= len(user_medias):
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        media = user_medias[consumption_index]
+        body = request.data or {}
+
+        validated_body, error = validate_body(body, "season")
+
+        if error:
+            return Response(
+                {"detail": f"{get_http_message(400)} {error}"},
+                status=400,
+            )
+
+        for field, value in validated_body.items():
+            if hasattr(media, field):
+                setattr(media, field, value)
+
+        try:
+            media.save()
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(400)}", "errors": str(e)},
+                status=400,
+            )
+
+        media.refresh_from_db()
+
+        serialized_data = serialize_data(
+            media,
+            context={"consumption_index": consumption_index},
+            serializer_class=HistorySerializer,
+        )
+        return Response(serialized_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/sync/
@@ -1889,7 +2133,128 @@ class MediaEpisodeDetailView(drf_views.APIView):
         season_number,
         episode_number,
     ):
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+        """Update a tracked episode item."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Episodes are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        body = request.data or {}
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                user,
+                media_id,
+                "episode",
+                source,
+                season_number=season_number,
+                episode_number=episode_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        if not user_medias:
+            return Response(
+                {
+                    "detail": f"{get_http_message(404)} Episode not found or not tracked.",
+                },
+                status=404,
+            )
+
+        media = user_medias[0]
+
+        validated_body, error = validate_body(body, "episode")
+
+        if error:
+            return Response(
+                {"detail": f"{get_http_message(400)} {error}"},
+                status=400,
+            )
+
+        for field, value in validated_body.items():
+            if hasattr(media, field):
+                setattr(media, field, value)
+
+        try:
+            media.save()
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(400)}", "errors": str(e)},
+                status=400,
+            )
+
+        media.refresh_from_db()
+
+        try:
+            media_metadata = services.get_media_metadata(
+                "season",
+                media_id,
+                source,
+                [season_number],
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        if not media_metadata:
+            return Response(
+                {"detail": f"{get_http_message(404)} Episode not found."},
+                status=404,
+            )
+
+        if "episodes" in media_metadata and media_metadata["episodes"] is not None:
+            episode = next(
+                (
+                    obj
+                    for obj in media_metadata["episodes"]
+                    if obj["episode_number"] == int(episode_number)
+                ),
+                None,
+            )
+
+            if not episode:
+                return Response(
+                    {"detail": "Not Found. Episode not found."},
+                    status=404,
+                )
+
+        media_metadata.pop("episodes")
+
+        data = {
+            "media_metadata": media_metadata,
+            "episode": episode,
+            "user_medias": user_medias,
+        }
+
+        serialized = serialize_data(
+            data,
+            serializer_class=CompleteEpisodeSerializer,
+        )
+        return Response(serialized, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/changes_history/
@@ -2166,7 +2531,88 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
         consumption_id,
     ):
         """Update a specific consumption history entry for a specific episode."""
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Episodes are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_medias = BasicMedia.objects.filter_media(
+                request.user,
+                media_id,
+                "episode",
+                source,
+                season_number=season_number,
+                episode_number=episode_number,
+            )
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
+
+        try:
+            consumption_index = int(consumption_id)
+        except ValueError:
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        if consumption_index < 0 or consumption_index >= len(user_medias):
+            return Response(
+                {"detail": f"{get_http_message(404)} Consumption entry not found."},
+                status=404,
+            )
+
+        media = user_medias[consumption_index]
+        body = request.data or {}
+
+        validated_body, error = validate_body(body, "episode")
+
+        if error:
+            return Response(
+                {"detail": f"{get_http_message(400)} {error}"},
+                status=400,
+            )
+
+        for field, value in validated_body.items():
+            if hasattr(media, field):
+                setattr(media, field, value)
+
+        try:
+            media.save()
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(400)}", "errors": str(e)},
+                status=400,
+            )
+
+        media.refresh_from_db()
+
+        serialized_data = serialize_data(
+            media,
+            context={"consumption_index": consumption_index},
+            serializer_class=HistorySerializer,
+        )
+        return Response(serialized_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/sync/
