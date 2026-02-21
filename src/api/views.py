@@ -810,6 +810,10 @@ class MediaConsumptionHistoryView(drf_views.APIView):
 
     def get(self, request, media_type, source, media_id):
         """Retrieve the history timeline for a specific media."""
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
         if not check_valid_type(media_type):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
@@ -837,16 +841,20 @@ class MediaConsumptionHistoryView(drf_views.APIView):
                 status=500,
             )
 
-        consumptions_number = len(user_medias)
-        consumptions = [
-            serialize_data(
-                media,
-                context={"consumption_index": consumptions_number - 1 - idx},
-                serializer_class=HistorySerializer,
-            )
-            for idx, media in enumerate(user_medias)
-        ]
-        return Response(consumptions, status=200)
+        # TODO: missing sorting
+        paginated_data = paginate_data(
+            request,
+            user_medias,
+            limit,
+            offset,
+        )
+        consumptions = serialize_data(
+            paginated_data["results"],
+            serializer_class=HistorySerializer,
+            many=True,
+        )
+        paginated_data["results"] = consumptions
+        return Response(paginated_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/history/[consumption_id]/
@@ -885,22 +893,14 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
                 status=500,
             )
 
-        try:
-            consumption_index = len(user_medias) - 1 - int(consumption_id)
-        except ValueError:
+        consumption = user_medias.filter(id=consumption_id).first()
+        if not consumption:
             return Response(
                 {"detail": f"{get_http_message(404)} Consumption entry not found."},
                 status=404,
             )
 
-        if consumption_index < 0 or consumption_index >= len(user_medias):
-            return Response(
-                {"detail": f"{get_http_message(404)} Consumption entry not found."},
-                status=404,
-            )
-
-        media = user_medias[consumption_index]
-        media.delete()
+        consumption.delete()
 
         return Response(status=204)
 
@@ -933,25 +933,15 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
                 status=500,
             )
 
-        try:
-            consumption_index = int(consumption_id)
-        except ValueError:
+        consumption = user_medias.filter(id=consumption_id).first()
+        if not consumption:
             return Response(
                 {"detail": f"{get_http_message(404)} Consumption entry not found."},
                 status=404,
             )
-
-        if consumption_index < 0 or consumption_index >= len(user_medias):
-            return Response(
-                {"detail": f"{get_http_message(404)} Consumption entry not found."},
-                status=404,
-            )
-
-        media = user_medias[consumption_index]
 
         serialized_data = serialize_data(
-            media,
-            context={"consumption_index": consumption_index},
+            consumption,
             serializer_class=HistorySerializer,
         )
         return Response(serialized_data, status=200)
@@ -985,21 +975,13 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
                 status=500,
             )
 
-        try:
-            consumption_index = int(consumption_id)
-        except ValueError:
+        consumption = user_medias.filter(id=consumption_id).first()
+        if not consumption:
             return Response(
                 {"detail": f"{get_http_message(404)} Consumption entry not found."},
                 status=404,
             )
 
-        if consumption_index < 0 or consumption_index >= len(user_medias):
-            return Response(
-                {"detail": f"{get_http_message(404)} Consumption entry not found."},
-                status=404,
-            )
-
-        media = user_medias[consumption_index]
         body = request.data or {}
 
         validated_body, error = validate_body(body, media_type)
@@ -1011,22 +993,21 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
             )
 
         for field, value in validated_body.items():
-            if hasattr(media, field):
-                setattr(media, field, value)
+            if hasattr(consumption, field):
+                setattr(consumption, field, value)
 
         try:
-            media.save()
+            consumption.save()
         except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": f"{get_http_message(400)}", "errors": str(e)},
                 status=400,
             )
 
-        media.refresh_from_db()
+        consumption.refresh_from_db()
 
         serialized_data = serialize_data(
-            media,
-            context={"consumption_index": consumption_index},
+            consumption,
             serializer_class=HistorySerializer,
         )
         return Response(serialized_data, status=200)
@@ -1573,6 +1554,10 @@ class MediaSeasonConsumptionHistoryView(drf_views.APIView):
 
     def get(self, request, media_type, source, media_id, season_number):
         """Retrieve the history timeline for a specific season of a tv serie."""
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
         if not check_valid_type(media_type):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
@@ -1609,16 +1594,20 @@ class MediaSeasonConsumptionHistoryView(drf_views.APIView):
                 status=500,
             )
 
-        consumptions_number = len(user_medias)
-        consumptions = [
-            serialize_data(
-                media,
-                context={"consumption_index": consumptions_number - 1 - idx},
-                serializer_class=HistorySerializer,
-            )
-            for idx, media in enumerate(user_medias)
-        ]
-        return Response(consumptions, status=200)
+        # TODO: missing sorting
+        paginated_data = paginate_data(
+            request,
+            user_medias,
+            limit,
+            offset,
+        )
+        consumptions = serialize_data(
+            paginated_data["results"],
+            serializer_class=HistorySerializer,
+            many=True,
+        )
+        paginated_data["results"] = consumptions
+        return Response(paginated_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/[consumption_id]/
@@ -1674,22 +1663,14 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
                 status=500,
             )
 
-        try:
-            consumption_index = len(user_medias) - 1 - int(consumption_id)
-        except ValueError:
+        consumption = user_medias.filter(id=consumption_id).first()
+        if not consumption:
             return Response(
                 {"detail": f"{get_http_message(404)} Consumption entry not found."},
                 status=404,
             )
 
-        if consumption_index < 0 or consumption_index >= len(user_medias):
-            return Response(
-                {"detail": f"{get_http_message(404)} Consumption entry not found."},
-                status=404,
-            )
-
-        media = user_medias[consumption_index]
-        media.delete()
+        consumption.delete()
 
         return Response(status=204)
 
@@ -1731,25 +1712,15 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
                 status=500,
             )
 
-        try:
-            consumption_index = int(consumption_id)
-        except ValueError:
+        consumption = user_medias.filter(id=consumption_id).first()
+        if not consumption:
             return Response(
                 {"detail": f"{get_http_message(404)} Consumption entry not found."},
                 status=404,
             )
-
-        if consumption_index < 0 or consumption_index >= len(user_medias):
-            return Response(
-                {"detail": f"{get_http_message(404)} Consumption entry not found."},
-                status=404,
-            )
-
-        media = user_medias[consumption_index]
 
         serialized_data = serialize_data(
-            media,
-            context={"consumption_index": consumption_index},
+            consumption,
             serializer_class=HistorySerializer,
         )
         return Response(serialized_data, status=200)
@@ -1800,21 +1771,13 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
                 status=500,
             )
 
-        try:
-            consumption_index = int(consumption_id)
-        except ValueError:
+        consumption = user_medias.filter(id=consumption_id).first()
+        if not consumption:
             return Response(
                 {"detail": f"{get_http_message(404)} Consumption entry not found."},
                 status=404,
             )
 
-        if consumption_index < 0 or consumption_index >= len(user_medias):
-            return Response(
-                {"detail": f"{get_http_message(404)} Consumption entry not found."},
-                status=404,
-            )
-
-        media = user_medias[consumption_index]
         body = request.data or {}
 
         validated_body, error = validate_body(body, "season")
@@ -1826,22 +1789,21 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
             )
 
         for field, value in validated_body.items():
-            if hasattr(media, field):
-                setattr(media, field, value)
+            if hasattr(consumption, field):
+                setattr(consumption, field, value)
 
         try:
-            media.save()
+            consumption.save()
         except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": f"{get_http_message(400)}", "errors": str(e)},
                 status=400,
             )
 
-        media.refresh_from_db()
+        consumption.refresh_from_db()
 
         serialized_data = serialize_data(
-            media,
-            context={"consumption_index": consumption_index},
+            consumption,
             serializer_class=HistorySerializer,
         )
         return Response(serialized_data, status=200)
@@ -2326,6 +2288,10 @@ class MediaEpisodeConsumptionHistoryView(drf_views.APIView):
 
     def get(self, request, media_type, source, media_id, season_number, episode_number):
         """Retrieve the history timeline for a specific episode of a tv serie."""
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
         if not check_valid_type(media_type):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
@@ -2363,16 +2329,20 @@ class MediaEpisodeConsumptionHistoryView(drf_views.APIView):
                 status=500,
             )
 
-        consumptions_number = len(user_medias)
-        consumptions = [
-            serialize_data(
-                media,
-                context={"consumption_index": consumptions_number - 1 - idx},
-                serializer_class=HistorySerializer,
-            )
-            for idx, media in enumerate(user_medias)
-        ]
-        return Response(consumptions, status=200)
+        # TODO: missing sorting
+        paginated_data = paginate_data(
+            request,
+            user_medias,
+            limit,
+            offset,
+        )
+        consumptions = serialize_data(
+            paginated_data["results"],
+            serializer_class=HistorySerializer,
+            many=True,
+        )
+        paginated_data["results"] = consumptions
+        return Response(paginated_data, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/[consumption_id]/
@@ -2430,22 +2400,14 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
                 status=500,
             )
 
-        try:
-            consumption_index = len(user_medias) - 1 - int(consumption_id)
-        except ValueError:
+        consumption = user_medias.filter(id=consumption_id).first()
+        if not consumption:
             return Response(
                 {"detail": f"{get_http_message(404)} Consumption entry not found."},
                 status=404,
             )
 
-        if consumption_index < 0 or consumption_index >= len(user_medias):
-            return Response(
-                {"detail": f"{get_http_message(404)} Consumption entry not found."},
-                status=404,
-            )
-
-        media = user_medias[consumption_index]
-        media.delete()
+        consumption.delete()
 
         return Response(status=204)
 
@@ -2497,25 +2459,15 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
                 status=500,
             )
 
-        try:
-            consumption_index = int(consumption_id)
-        except ValueError:
+        consumption = user_medias.filter(id=consumption_id).first()
+        if not consumption:
             return Response(
                 {"detail": f"{get_http_message(404)} Consumption entry not found."},
                 status=404,
             )
-
-        if consumption_index < 0 or consumption_index >= len(user_medias):
-            return Response(
-                {"detail": f"{get_http_message(404)} Consumption entry not found."},
-                status=404,
-            )
-
-        media = user_medias[consumption_index]
 
         serialized_data = serialize_data(
-            media,
-            context={"consumption_index": consumption_index},
+            consumption,
             serializer_class=HistorySerializer,
         )
         return Response(serialized_data, status=200)
@@ -2568,21 +2520,13 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
                 status=500,
             )
 
-        try:
-            consumption_index = int(consumption_id)
-        except ValueError:
+        consumption = user_medias.filter(id=consumption_id).first()
+        if not consumption:
             return Response(
                 {"detail": f"{get_http_message(404)} Consumption entry not found."},
                 status=404,
             )
 
-        if consumption_index < 0 or consumption_index >= len(user_medias):
-            return Response(
-                {"detail": f"{get_http_message(404)} Consumption entry not found."},
-                status=404,
-            )
-
-        media = user_medias[consumption_index]
         body = request.data or {}
 
         validated_body, error = validate_body(body, "episode")
@@ -2594,22 +2538,21 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
             )
 
         for field, value in validated_body.items():
-            if hasattr(media, field):
-                setattr(media, field, value)
+            if hasattr(consumption, field):
+                setattr(consumption, field, value)
 
         try:
-            media.save()
+            consumption.save()
         except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": f"{get_http_message(400)}", "errors": str(e)},
                 status=400,
             )
 
-        media.refresh_from_db()
+        consumption.refresh_from_db()
 
         serialized_data = serialize_data(
-            media,
-            context={"consumption_index": consumption_index},
+            consumption,
             serializer_class=HistorySerializer,
         )
         return Response(serialized_data, status=200)
@@ -2716,6 +2659,7 @@ class SearchProviderView(drf_views.APIView):
             else len(results_accum)
         )
 
+        # TODO: use pagination helpers
         sliced = results_accum[offset : offset + limit]
         next_url = None
         prev_url = None

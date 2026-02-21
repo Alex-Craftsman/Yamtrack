@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.15
+  version: 0.0.16
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -861,9 +861,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ConsumptionInfos"
+                $ref: "#/components/schemas/PaginatedConsumptionHistory"
         "400":
           description: Bad Request
           content:
@@ -2832,6 +2830,9 @@ components:
     CompleteMedia:
       type: object
       properties:
+        id:
+          type: integer
+          description: The id of the item in the database (not to be confused with the item_id, which is media provider specific)
         media_id:
           type: integer
         source:
@@ -2901,10 +2902,7 @@ components:
       properties:
         consumption_id:
           type: integer
-          description: The sequential consumption number for this specific media (e.g., 1st watch, 2nd watch, etc.)
-        database_id:
-          type: integer
-          description: The unique database identifier for this record
+          description: The id of the media consumption (id numbers are global for all consumptions of all medias, not sequential per media)
         created:
           type: string
           format: date-time
@@ -3231,8 +3229,6 @@ components:
     Item:
       type: object
       properties:
-        id:
-          type: integer
         media_id:
           type: string
         source:
@@ -3269,6 +3265,10 @@ components:
       properties:
         id:
           type: integer
+          description: The id of the item in the database (not to be confused with the item_id, which is media provider specific)
+        consumption_id:
+          type: integer
+          description: The id of the media consumption (id numbers are global for all consumptions of all medias, not sequential per media)
         item:
           $ref: "#/components/schemas/Item"
         item_id:
@@ -3379,15 +3379,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CalendarEvent"
-    PaginatedEpisodes:
-      type: object
-      properties:
-        pagination:
-          $ref: "#/components/schemas/Pagination"
-        results:
-          type: array
-          items:
-            $ref: "#/components/schemas/Episode"
     PaginatedChangesHistory:
       type: object
       properties:
@@ -3397,6 +3388,24 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ChangesHistoryRecord"
+    PaginatedEpisodes:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Episode"
+    PaginatedLists:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/List"
     PaginatedMedia:
       type: object
       properties:
@@ -3953,4 +3962,3 @@ components:
         notes:
           type: string
           nullable: true
-    

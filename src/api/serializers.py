@@ -57,7 +57,7 @@ class ItemSerializer(serializers.ModelSerializer):
 
     class Meta:  # noqa: D106
         model = Item
-        fields = "__all__"
+        exclude = ("id",)
 
 
 class ChangesHistoryEntrySerializer(serializers.Serializer):
@@ -132,16 +132,14 @@ class CompleteEpisodeSerializer(serializers.Serializer):
         )
 
         consumptions_number = len(user_medias)
-        consumptions = [
-            serialize_data(
-                media,
-                context={"consumption_index": consumptions_number - 1 - idx},
-                serializer_class=HistorySerializer,
-            )
-            for idx, media in enumerate(user_medias)
-        ]
+        consumptions = serialize_data(
+            user_medias,
+            serializer_class=HistorySerializer,
+            many=True,
+        )
 
         return {
+            "id": user_medias[0].item_id if user_medias else None,
             "media_id": int(media_metadata.get("media_id")),
             "source": media_metadata.get("source"),
             "source_url": source_url,
@@ -241,19 +239,16 @@ class CompleteMediaSerializer(serializers.Serializer):
         related = media_metadata.get("related", {})
 
         consumptions_number = len(user_medias)
-        # Enumerate in reverse order so first item (newest) gets highest index
-        consumptions = [
-            serialize_data(
-                media,
-                context={"consumption_index": consumptions_number - 1 - idx},
-                serializer_class=HistorySerializer,
-            )
-            for idx, media in enumerate(user_medias)
-        ]
+        consumptions = serialize_data(
+            user_medias,
+            serializer_class=HistorySerializer,
+            many=True,
+        )
 
         # TODO: Check why some informations take a while to update after a change
 
         return {
+            "id": user_medias[0].item_id if user_medias else None,
             "media_id": int(media_metadata.get("media_id")),
             "source": media_metadata.get("source"),
             "source_url": media_metadata.get("source_url"),
@@ -372,12 +367,8 @@ class HistorySerializer(serializers.Serializer):
         """Transform a user media instance into a watch history entry."""
         # For Episode instances, use simplified structure
         if isinstance(instance, Episode):
-            consumption_index = (
-                self.context.get("consumption_index") if self.context else None
-            )
             return {
-                "consumption_id": consumption_index,
-                "database_id": instance.id,
+                "consumption_id": instance.id,
                 "created": instance.created_at
                 if hasattr(instance, "created_at")
                 else None,
@@ -396,12 +387,9 @@ class HistorySerializer(serializers.Serializer):
                 "notes": "",
             }
         status = StatusField().to_representation(instance)
-        consumption_index = (
-            self.context.get("consumption_index") if self.context else None
-        )
+
         return {
-            "consumption_id": consumption_index,
-            "database_id": instance.id,
+            "consumption_id": instance.id,
             "created": instance.created_at
             if hasattr(instance, "created_at") and instance.created_at is not None
             else None,
@@ -444,6 +432,8 @@ class InfoSerializer(serializers.Serializer):
 class MediaSerializer(serializers.ModelSerializer):
     """Serializer used for media items."""
 
+    id = serializers.IntegerField(source="item.id", read_only=True)
+    consumption_id = serializers.IntegerField(source="id", read_only=True)
     item = ItemSerializer()
     item_id = ItemIdField(source="item", read_only=True)
     parent_id = ParentIdField(source="item", read_only=True)
