@@ -752,7 +752,7 @@ class ListItemToggleTests(TestCase):
     def test_list_item_owner_toggle_remove(self):
         """Test removing an item from a list as owner."""
         self.client.login(**self.credentials)
-        self.list.items.add(self.item)
+        CustomListItem.objects.create(custom_list=self.list, item=self.item)
         response = self.client.post(
             reverse("list_item_toggle"),
             {
@@ -779,7 +779,7 @@ class ListItemToggleTests(TestCase):
     def test_list_item_collaborator_toggle_remove(self):
         """Test removing an item from a list as collaborator."""
         self.client.login(**self.collaborator_credentials)
-        self.list.items.add(self.item)
+        CustomListItem.objects.create(custom_list=self.list, item=self.item)
         response = self.client.post(
             reverse("list_item_toggle"),
             {

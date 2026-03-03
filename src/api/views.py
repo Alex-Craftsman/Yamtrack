@@ -84,6 +84,8 @@ from .serializers import (
 
 # TODO!!: since it's possible to add to lists untracked items, the id field can be null, so it's impossible to get these elements from the list, while it should be possible. The untracked added element is in the Items table, but not in the media tables.
 
+# TODO: look into django.core.paginator Paginator
+
 
 # /api/v1/calendar/
 class CalendarView(drf_views.APIView):
@@ -363,28 +365,332 @@ class ListsView(drf_views.APIView):
             )
 
 
-# /api/v1/lists/[id]/
-class ListDetailView(drf_views.APIView):  # noqa: D101
-    def get(self, request, id):  # noqa: A002, ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+# /api/v1/lists/[list_id]/
+class ListDetailView(drf_views.APIView):
+    """List detail view."""
 
-    def patch(self, request, id):  # noqa: A002, ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+    permission_classes = [permissions.IsAuthenticated]
 
-    def delete(self, request, id):  # noqa: A002, ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+    def delete(self, request, list_id):
+        """Delete a specific custom list."""
+        user = request.user
+
+        try:
+            custom_list = CustomList.objects.get(id=list_id)
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not custom_list.user_can_delete(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        custom_list.delete()
+        return Response(status=204)
+
+    def get(self, request, list_id):
+        """Retrieve details and paginated items of a specific list."""
+        user = request.user
+
+        try:
+            # TODO: move to lists/models.py
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("collaborators", "items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_view(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        items = user_list.items.all()
+
+        search_query = request.GET.get("search", "")
+        sort_filter = request.GET.get("sort", "")
+        # TODO: move to lists/models.py
+        if search_query:
+            items = items.filter(title__icontains=search_query)
+
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        media_objects = []
+        for item in items:
+            # Shows info about the last consumption of the media if it's tracked
+            media = BasicMedia.objects.filter_media_prefetch(
+                user,
+                item.media_id,
+                item.media_type,
+                item.source,
+                season_number=item.season_number,
+                episode_number=item.episode_number,
+            ).first()
+
+            media_objects.append(media if media is not None else item)
+
+        if sort_filter:
+            sort, sort_order = parse_sort_filter(sort_filter)
+            if sort not in get_sorts(None, sort_type="all"):
+                return Response(
+                    {"detail": f"{get_http_message(404)} Invalid sorting"},
+                    status=404,
+                )
+            media_objects = apply_aggregated_sort(media_objects, sort)
+            if isinstance(media_objects, Response):
+                return media_objects
+            if sort_order == "desc":
+                media_objects.reverse()
+
+        paginated_data = paginate_data(request, media_objects, limit, offset)
+        serialized_list = serialize_data(
+            user_list,
+            context={"paginated_items": paginated_data},
+        )
+
+        return Response(serialized_list, status=200)
+
+    def patch(self, request, list_id):
+        """Update a specific custom list."""
+        user = request.user
+        body = request.data
+
+        try:
+            # TODO: move to lists/models.py
+            custom_list = CustomList.objects.get(id=list_id)
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not custom_list.user_can_edit(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        name = body.get("name")
+        description = body.get("description")
+        collaborator_ids = body.get("collaborators")
+
+        if name is not None:
+            custom_list.name = name.strip()
+        if description is not None:
+            custom_list.description = description
+        if collaborator_ids is not None:
+            if not isinstance(collaborator_ids, list):
+                return Response(
+                    {
+                        "detail": f"{get_http_message(400)} Field 'collaborators' must be an array of user IDs.",
+                    },
+                    status=400,
+                )
+            collaborators = get_user_model().objects.filter(id__in=collaborator_ids)
+            if collaborators.count() != len(collaborator_ids):
+                return Response(
+                    {
+                        "detail": f"{get_http_message(400)} One or more collaborator IDs are invalid.",
+                    },
+                    status=400,
+                )
+            custom_list.collaborators.set(collaborators)
+
+        custom_list.save()
+        serialized_data = serialize_data(
+            custom_list,
+            context={"request": request},
+        )
+        return Response(serialized_data, status=200)
 
 
-# /api/v1/lists/[id]/items/
-class ListAddItemView(drf_views.APIView):  # noqa: D101
-    def post(self, request, id):  # noqa: A002, ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+# /api/v1/lists/[list_id]/items/
+class ListItemsView(drf_views.APIView):
+    """List items view."""
+
+    def get(self, request, list_id):
+        """Get items of a list."""
+        user = request.user
+
+        try:
+            # TODO: move to lists/models.py
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_view(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        items = user_list.items.all()
+
+        search_query = request.GET.get("search", "")
+        sort_filter = request.GET.get("sort", "")
+        # TODO: move to lists/models.py
+        if search_query:
+            items = items.filter(title__icontains=search_query)
+
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        media_objects = []
+        for item in items:
+            # Shows info about the last consumption of the media if it's tracked
+            media = BasicMedia.objects.filter_media_prefetch(
+                user,
+                item.media_id,
+                item.media_type,
+                item.source,
+                season_number=item.season_number,
+                episode_number=item.episode_number,
+            ).first()
+
+            media_objects.append(media if media is not None else item)
+
+        if sort_filter:
+            sort, sort_order = parse_sort_filter(sort_filter)
+            if sort not in get_sorts(None, sort_type="all"):
+                return Response(
+                    {"detail": f"{get_http_message(404)} Invalid sorting"},
+                    status=404,
+                )
+            media_objects = apply_aggregated_sort(media_objects, sort)
+            if isinstance(media_objects, Response):
+                return media_objects
+            if sort_order == "desc":
+                media_objects.reverse()
+
+        paginated_data = paginate_data(request, media_objects, limit, offset)
+        # TODO: status field is always `none`
+        # TODO: should add the `tracked` boolean to the serialization
+        serialized_data = serialize_data(
+            paginated_data["results"],
+            many=True,
+            context={"serialize_items_as_media": True},
+            homogeneous=False,
+        )
+        paginated_data["results"] = serialized_data
+        return Response(paginated_data, status=200)
 
 
-# /api/v1/lists/[id]/items/[item_id]/
-class ListRemoveItemView(drf_views.APIView):  # noqa: D101
-    def delete(self, request, id, item_id):  # noqa: A002, ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+# /api/v1/lists/[list_id]/items/[item_id]/
+class ListItemView(drf_views.APIView):
+    """List item detail view."""
+
+    def delete(self, request, list_id, item_id):
+        """Delete an item from a list."""
+        user = request.user
+
+        try:
+            # TODO: move to lists/models.py
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_edit(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        try:
+            list_item = user_list.get_list_item(item_id, include_item=True)
+        except CustomListItem.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} Item not found in the list."},
+                status=404,
+            )
+
+        list_item.delete()
+        return Response(status=204)
+
+    def get(self, request, list_id, item_id):
+        """Get details of a list item."""
+        user = request.user
+
+        try:
+            # TODO: move to lists/models.py
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_view(user):
+            return Response(
+                {
+                    "detail": f"{get_http_message(403)} You don't have permission to view this list.",
+                },
+                status=403,
+            )
+
+        try:
+            list_item = user_list.get_list_item(item_id, include_item=True)
+            item = list_item.item
+        except CustomListItem.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} Item not found in the list."},
+                status=404,
+            )
+
+        view_class = MediaDetailView
+        extra_kwargs = {"media_type": item.media_type}
+
+        if item.media_type == MediaTypes.SEASON.value:
+            view_class = MediaSeasonDetailView
+            extra_kwargs = {
+                "media_type": MediaTypes.TV.value,
+                "season_number": item.season_number,
+            }
+        elif item.media_type == MediaTypes.EPISODE.value:
+            view_class = MediaEpisodeDetailView
+            extra_kwargs = {
+                "media_type": MediaTypes.TV.value,
+                "season_number": item.season_number,
+                "episode_number": item.episode_number,
+            }
+
+        # Call the appropriate media detail class to avoid code duplication
+        return view_class().get(
+            request,
+            source=item.source,
+            media_id=item.media_id,
+            **extra_kwargs,
+        )
 
 
 # /api/v1/media/
@@ -459,7 +765,7 @@ class MediaListView(drf_views.APIView):
             paginated_data["results"],
             context={"request": request},
             many=True,
-            homogeneus=False,
+            homogeneous=False,
         )
         paginated_data["results"] = serialized_data
         return Response(paginated_data, status=200)

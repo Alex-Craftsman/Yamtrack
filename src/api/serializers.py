@@ -54,7 +54,6 @@ class StatusField(serializers.Field):
 
 
 class ItemSerializer(serializers.ModelSerializer):
-    # TODO: should serialize also non tracked items
     """Serializer used for item details."""
 
     class Meta:  # noqa: D106
@@ -106,7 +105,7 @@ class ChangesHistoryEntrySerializer(serializers.Serializer):
 
 
 class CompleteEpisodeSerializer(serializers.Serializer):
-    # TODO: should serialize also non tracked items
+    # TODO: add lists field with list_id and list_item_id for each media
     """Serializer that builds a CompleteEpisode response."""
 
     def to_representation(self, instance):
@@ -173,7 +172,7 @@ class CompleteEpisodeSerializer(serializers.Serializer):
 
 
 class CompleteMediaSerializer(serializers.Serializer):
-    # TODO: should serialize also non tracked items
+    # TODO: add lists field with list_id and list_item_id for each media
     """Serializer that builds a CompleteMedia response."""
 
     def _process_seasons(self, media_metadata):
@@ -278,7 +277,7 @@ class CompleteMediaSerializer(serializers.Serializer):
 
 
 class EpisodeSerializer(serializers.ModelSerializer):
-    # TODO: should serialize also non tracked items
+    # TODO: add lists field with list_id and list_item_id for each media
     """Serializer used for Episode items."""
 
     def to_representation(self, instance):
@@ -448,6 +447,10 @@ class ListSerializer(serializers.Serializer):
 
         if self.context and self.context.get("paginated_items") is not None:
             items_context = self.context["paginated_items"]
+            nested_context = {
+                **self.context,
+                "serialize_items_as_media": True,
+            }
 
             if isinstance(items_context, dict) and "results" in items_context:
                 items = {
@@ -455,7 +458,8 @@ class ListSerializer(serializers.Serializer):
                     "results": serialize_data(
                         items_context.get("results", []),
                         many=True,
-                        homogeneus=False,
+                        context=nested_context,
+                        homogeneous=False,
                     ),
                 }
             else:
@@ -485,7 +489,7 @@ class ListSerializer(serializers.Serializer):
 
 
 class MediaSerializer(serializers.ModelSerializer):
-    # TODO: should serialize also non tracked items
+    # TODO: add lists field with list_id and list_item_id for each media
     """Serializer used for media items."""
 
     id = serializers.IntegerField(source="item.id", read_only=True)
@@ -493,18 +497,28 @@ class MediaSerializer(serializers.ModelSerializer):
     item = ItemSerializer()
     item_id = ItemIdField(source="item", read_only=True)
     parent_id = ParentIdField(source="item", read_only=True)
-    status = StatusField(source="item", read_only=True)
+    tracked = serializers.SerializerMethodField()
+    status = StatusField(source="*", read_only=True)
 
     class Meta:  # noqa: D106
         model = BasicMedia
         exclude = ("user",)
 
+    def get_tracked(self, obj):
+        """Return True because MediaSerializer handles tracked media instances."""
+        return True
+
 
 class MixedMediaSerializer(serializers.Serializer):
+    # TODO: add lists field with list_id and list_item_id for each media
     """Serializer that handles mixed media types by checking every item."""
 
     def to_representation(self, instance):
         """Detect instance type and use appropriate serializer."""
+        if isinstance(instance, Item) and self.context.get("serialize_items_as_media"):
+            serializer = UntrackedMediaSerializer(instance, context=self.context)
+            return serializer.data
+
         instance_type = type(instance)
         serializer_class = serializer_map.get(instance_type)
 
@@ -520,8 +534,32 @@ class MixedMediaSerializer(serializers.Serializer):
         return serializer.data
 
 
+class UntrackedMediaSerializer(serializers.Serializer):
+    # TODO: add lists field with list_id and list_item_id for each media
+    """Serialize an untracked Item with a Media-like response shape."""
+
+    def to_representation(self, instance):
+        """Return media-compatible payload for an untracked Item."""
+        return {
+            "id": instance.id,
+            "consumption_id": None,
+            "item": serialize_data(instance, serializer_class=ItemSerializer),
+            "item_id": ItemIdField().to_representation(instance),
+            "parent_id": ParentIdField().to_representation(instance),
+            "tracked": False,
+            "created_at": None,
+            "score": None,
+            "status": None,
+            "progress": None,
+            "start_date": None,
+            "end_date": None,
+            "notes": None,
+            "lists": [],
+        }
+
+
 class SeasonSerializer(serializers.ModelSerializer):
-    # TODO: should serialize also non tracked items
+    # TODO: add lists field with list_id and list_item_id for each media
     """Serializer used for Season items."""
 
     def to_representation(self, instance):
@@ -586,7 +624,7 @@ def serialize_data(
     many=False,
     context=None,
     serializer_class=None,
-    homogeneus=True,
+    homogeneous=True,
 ):
     """Serialize data using the appropriate serializer class."""
     # If serializer class is explicitly provided, use it
@@ -605,7 +643,7 @@ def serialize_data(
 
         # Check if data is homogeneous (all same type)
         first_type = type(data_list[0])
-        if homogeneus:
+        if homogeneous:
             detected_serializer_class = serializer_map.get(first_type)
 
             if detected_serializer_class is None:

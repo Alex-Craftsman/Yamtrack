@@ -85,6 +85,90 @@ class CustomListModelTest(TestCase):
                 custom_list=self.custom_list,
             )
 
+    def test_list_item_id_is_sequential_per_list(self):
+        """Test list_item_id is assigned sequentially for each list."""
+        second_item = Item.objects.create(
+            title="Second Test Item",
+            media_id="456",
+            media_type=MediaTypes.TV.value,
+            source=Sources.TMDB.value,
+        )
+
+        first_list_item = CustomListItem.objects.create(
+            item=self.item,
+            custom_list=self.custom_list,
+        )
+        second_list_item = CustomListItem.objects.create(
+            item=second_item,
+            custom_list=self.custom_list,
+        )
+
+        self.assertEqual(first_list_item.list_item_id, 0)
+        self.assertEqual(second_list_item.list_item_id, 1)
+
+    def test_bulk_create_assigns_sequential_ids(self):
+        """Test bulk_create assigns list_item_id for custom list items."""
+        second_item = Item.objects.create(
+            title="Second Bulk Test Item",
+            media_id="789",
+            media_type=MediaTypes.TV.value,
+            source=Sources.TMDB.value,
+        )
+        third_item = Item.objects.create(
+            title="Third Bulk Test Item",
+            media_id="790",
+            media_type=MediaTypes.TV.value,
+            source=Sources.TMDB.value,
+        )
+
+        created_items = CustomListItem.objects.bulk_create(
+            [
+                CustomListItem(item=self.item, custom_list=self.custom_list),
+                CustomListItem(item=second_item, custom_list=self.custom_list),
+                CustomListItem(item=third_item, custom_list=self.custom_list),
+            ],
+        )
+
+        self.assertEqual(created_items[0].list_item_id, 0)
+        self.assertEqual(created_items[1].list_item_id, 1)
+        self.assertEqual(created_items[2].list_item_id, 2)
+
+    def test_delete_renumbers_following_list_item_ids(self):
+        """Test deleting an item closes list_item_id gaps preserving previous order."""
+        second_item = Item.objects.create(
+            title="Second Delete Test Item",
+            media_id="791",
+            media_type=MediaTypes.TV.value,
+            source=Sources.TMDB.value,
+        )
+        third_item = Item.objects.create(
+            title="Third Delete Test Item",
+            media_id="792",
+            media_type=MediaTypes.TV.value,
+            source=Sources.TMDB.value,
+        )
+
+        first_list_item = CustomListItem.objects.create(
+            item=self.item,
+            custom_list=self.custom_list,
+        )
+        second_list_item = CustomListItem.objects.create(
+            item=second_item,
+            custom_list=self.custom_list,
+        )
+        third_list_item = CustomListItem.objects.create(
+            item=third_item,
+            custom_list=self.custom_list,
+        )
+
+        second_list_item.delete()
+
+        first_list_item.refresh_from_db()
+        third_list_item.refresh_from_db()
+
+        self.assertEqual(first_list_item.list_item_id, 0)
+        self.assertEqual(third_list_item.list_item_id, 1)
+
 
 class CustomListManagerTest(TestCase):
     """Test case for the CustomListManager."""

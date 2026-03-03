@@ -24,12 +24,12 @@ urlpatterns = [
     ),
     re_path(
         r"^lists/(?P<list_id>\d+)/items/?$",
-        views.ListAddItemView.as_view(),
+        views.ListItemsView.as_view(),
         name="api_list_add_item",
     ),
     re_path(
         r"^lists/(?P<list_id>\d+)/items/(?P<item_id>\d+)/?$",
-        views.ListRemoveItemView.as_view(),
+        views.ListItemView.as_view(),
         name="api_list_remove_item",
     ),
     re_path(r"^media/?$", views.MediaListView.as_view(), name="api_media_list"),

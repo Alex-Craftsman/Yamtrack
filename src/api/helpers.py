@@ -500,7 +500,7 @@ def parse_sort_filter(sort_filter):
 
 def itemid_key_compare(media):
     """Key function for sorting by item_id."""
-    item = getattr(media, "item", None)
+    item = getattr(media, "item", media)
     media_type = getattr(item, "media_type", "")
     source = getattr(item, "source", "")
     media_id_raw = getattr(item, "media_id", 0)
@@ -509,6 +509,41 @@ def itemid_key_compare(media):
     except (TypeError, ValueError):
         media_id_num = 0
     return (media_type, source, media_id_num)
+
+
+def _item_from_result(media):
+    """Return Item object from a media result or the result itself if it already is."""
+    return getattr(media, "item", media)
+
+
+def _sort_nullable(value):
+    """Build sortable tuple handling null values consistently."""
+    return (value is None, value)
+
+
+def _sort_source(media):
+    """Return source key from both media and item objects."""
+    item = _item_from_result(media)
+    return getattr(item, "source", "")
+
+
+def _sort_mediaid(media):
+    """Return item database id from both media and item objects."""
+    item = _item_from_result(media)
+    return getattr(item, "id", 0)
+
+
+def _sort_title(media):
+    """Return lowercased title key from both media and item objects."""
+    item = _item_from_result(media)
+    title = getattr(item, "title", "")
+    return title.lower() if isinstance(title, str) else ""
+
+
+def _sort_type(media):
+    """Return media type key from both media and item objects."""
+    item = _item_from_result(media)
+    return getattr(item, "media_type", "")
 
 
 _AGGREGATED_MANUAL_SORT_KEYS = {
@@ -529,17 +564,17 @@ def apply_manual_sort_for_type(results, sort):
 
 
 _AGGREGATED_SORT_KEYS = {
-    "added": lambda media: media.created_at,
-    "ended": lambda media: media.end_date,
+    "added": lambda media: _sort_nullable(getattr(media, "created_at", None)),
+    "ended": lambda media: _sort_nullable(getattr(media, "end_date", None)),
     "id": lambda media: int(media.id),
     "itemid": itemid_key_compare,
-    "mediaid": lambda media: media.item.id,
-    "progress": lambda media: int(media.progress),
-    "source": lambda media: media.item.source,
-    "started": lambda media: media.start_date,
-    "title": lambda media: media.item.title.lower(),
-    "type": lambda media: media.item.media_type,
-    "updated": lambda media: media.progressed_at,
+    "mediaid": _sort_mediaid,
+    "progress": lambda media: int(getattr(media, "progress", 0) or 0),
+    "source": _sort_source,
+    "started": lambda media: _sort_nullable(getattr(media, "start_date", None)),
+    "title": _sort_title,
+    "type": _sort_type,
+    "updated": lambda media: _sort_nullable(getattr(media, "progressed_at", None)),
 }
 
 
