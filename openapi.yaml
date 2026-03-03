@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.16
+  version: 0.0.17
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -241,9 +241,62 @@ paths:
       tags:
         - lists
       summary: List the user's custom lists
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Case-insensitive substring search on list name or description
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/ListsSortOptions"
+          description: Sort order for results
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedLists"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     post:
       tags:
         - lists
@@ -253,10 +306,50 @@ paths:
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/CreateList"
+            examples:
+              basic:
+                summary: Basic list creation
+                value:
+                  name: "My Favorite Movies"
+                  description: "A list of my all-time favorite movies."
+              detailed:
+                summary: Detailed list creation
+                value:
+                  name: "Sci-Fi Collection"
+                  description: "A curated list of the best science fiction films."
+                  collaborators: [2, 5]
       responses:
         "201":
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteList"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/lists/{list_id}/:
     delete:
       tags:
@@ -270,7 +363,31 @@ paths:
             type: integer
       responses:
         "204":
-          description: Deleted
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     get:
       tags:
         - lists
@@ -281,9 +398,61 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Case-insensitive substring search on item titles
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/SortOptions"
+          description: Sort order for results
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteList"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     patch:
       tags:
         - lists
@@ -299,10 +468,50 @@ paths:
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/EditList"
+            examples:
+              basic:
+                summary: Basic list editing
+                value:
+                  name: "My Favorite Movies"
+                  description: "A list of my all-time favorite movies."
+              detailed:
+                summary: Detailed list editing
+                value:
+                  name: "Sci-Fi Collection"
+                  description: "A curated list of the best science fiction films."
+                  collaborators: [2, 5]
       responses:
         "200":
-          description: Updated
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteList"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/lists/{list_id}/items/:
     get:
       tags:
@@ -315,32 +524,41 @@ paths:
           schema:
             type: integer
       responses:
-        "204":
+        "200":
           description: OK
-    post:
-      tags:
-        - lists
-      summary: Add an Item to a list
-      parameters:
-        - in: path
-          name: list_id
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "204":
-          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/lists/{list_id}/items/{item_id}/:
     delete:
       tags:
         - lists
-      summary: Remove an Item from a list
+      summary: Remove an item from a list
       parameters:
         - in: path
           name: list_id
@@ -349,12 +567,37 @@ paths:
             type: integer
         - in: path
           name: item_id
+          description: Sequential item identifier scoped to the list (starts from 0).
           required: true
           schema:
             type: integer
       responses:
         "204":
           description: Removed
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     get:
       tags:
         - lists
@@ -367,12 +610,41 @@ paths:
             type: integer
         - in: path
           name: item_id
+          description: Sequential item identifier scoped to the list (starts from 0).
           required: true
           schema:
             type: integer
       responses:
-        "300":
-          description: Redirect to /api/v1/media/{media_type}/{source}/{media_id}/
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/:
     get:
       tags:
@@ -1068,10 +1340,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/lists/:
-    delete:
+    get:
       tags:
         - lists
-      summary: Remove the item's Item from a list
+      summary: List lists that the item belongs to
       parameters:
         - in: path
           name: media_type
@@ -1088,14 +1360,13 @@ paths:
           required: true
           schema:
             type: integer
-        - in: query
-          name: list_id
-          required: true
-          schema:
-            type: integer
       responses:
-        "204":
-          description: Removed
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedLists"
         "400":
           description: Bad Request
           content:
@@ -1149,6 +1420,59 @@ paths:
       responses:
         "204":
           description: Added
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/lists/{list_id}:
+    delete:
+      tags:
+        - lists
+      summary: Remove the item from a specific list by list id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
         "400":
           description: Bad Request
           content:
@@ -2827,7 +3151,45 @@ components:
               image:
                 type: string
                 format: uri
+    CompleteList:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+          format: uri
+        owner:
+          type: object
+          properties:
+            id:
+              type: number
+              description: The id of the user of the owner
+            username:
+              type: string
+        collaborators:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: number
+                description: The id of the user of the collaborator
+              username:
+                type: string
+        items_count:
+          type: number
+        latest_update:
+          type: string
+          format: timestamp
+        items:
+          $ref: "#/components/schemas/PaginatedMedia"
     CompleteMedia:
+      # TODO: add the lists where the media is, with the list_id position
       type: object
       properties:
         id:
@@ -2897,12 +3259,23 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ConsumptionInfos"
+        lists:
+          type: array
+          items:
+            type: object
+            properties:
+              list_id:
+                type: integer
+              # list_name:
+              #   type: string
+              list_item_id:
+                type: integer
     ConsumptionInfos:
       type: object
       properties:
         consumption_id:
           type: integer
-          description: The id of the media consumption (id numbers are global for all consumptions of all medias, not sequential per media)
+          description: The id of the media consumption (id numbers are global for all consumptions of all medias of the same type, not sequential per media)
         created:
           type: string
           format: date-time
@@ -2930,6 +3303,20 @@ components:
           nullable: true
         notes:
           type: string
+          nullable: true
+    CreateList:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        collaborators:
+          type: array
+          items:
+            type: number
+          description: List of username ids allowed to collaborate on this list
           nullable: true
     CreateMedia:
       description: |
@@ -3005,6 +3392,21 @@ components:
           format: float
         profile_path:
           type: string
+    EditList:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        collaborators:
+          type: array
+          items:
+            type: number
+          description: List of username ids allowed to collaborate on this list
+          nullable: true
     Episode:
       type: object
       properties:
@@ -3252,6 +3654,112 @@ components:
       type: string
       description: media_type/media_source/media_id(/season/episode)
       nullable: true
+    List:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+          format: uri
+        owner:
+          type: object
+          properties:
+            id:
+              type: number
+              description: The id of the user of the owner
+            username:
+              type: string
+        collaborators:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: number
+                description: The id of the user of the collaborator
+              username:
+                type: string
+        items_count:
+          type: number
+        latest_update:
+          type: string
+          format: timestamp
+    ListsSortOptions:
+      type: string
+      enum:
+        - items_asc
+        - items_desc
+        - name_asc
+        - name_desc
+        - new_asc
+        - new_desc
+        - update_asc
+        - update_desc
+      x-enumNames:
+        - Items Count Ascending
+        - Items Count Descending
+        - Name Ascending
+        - Name Descending
+        - New Ascending
+        - New Descending
+        - Latest Update Ascending
+        - Latest Update Descending
+      description: |
+        Sorting options for lists:
+          items_asc = Number of items in the list ascending
+          items_desc = Number of items in the list descending
+          name_asc = List name ascending
+          name_desc = List name descending
+          new_asc = Date of creation ascending
+          new_desc = Date of creation descending
+          update_asc = Date of the latest update to the list ascending
+          update_desc = Date of the latest update to the list descending
+      #   type: string
+      #   enum:
+      #     - added_asc
+      #     - added_desc
+      #     - title_asc
+      #     - title_desc
+      #     - progress_asc
+      #     - progress_desc
+      #     - score_asc
+      #     - score_desc
+      #     - start_asc
+      #     - start_desc
+      #     - end_asc
+      #     - end_desc
+      #   x-enumNames:
+      #     - Added Date Ascending
+      #     - Added Date Descending
+      #     - Title Ascending
+      #     - Title Descending
+      #     - Progress Ascending
+      #     - Progress Descending
+      #     - Score Ascending
+      #     - Score Descending
+      #     - Start Date Ascending
+      #     - Start Date Descending
+      #     - End Date Ascending
+      #     - End Date Descending
+      #   description: |
+      #     Sorting options for list items:
+      #       added_asc = Date added to the list
+      #       added_desc = Date added to the list
+      #       title_asc = Media title
+      #       title_desc = Media title
+      #       progress_asc = User progress
+      #       progress_desc = User progress
+      #       score_asc = User score
+      #       score_desc = User score
+      #       start_asc = User start date
+      #       start_desc = User start date
+      #       end_asc = User end date
+      #       end_desc = User end date
     MangaDetails:
       # TODO: missing fields
       type: object
@@ -3266,9 +3774,6 @@ components:
         id:
           type: integer
           description: The id of the item in the database (not to be confused with the item_id, which is media provider specific)
-        consumption_id:
-          type: integer
-          description: The id of the media consumption (id numbers are global for all consumptions of all medias, not sequential per media)
         item:
           $ref: "#/components/schemas/Item"
         item_id:
@@ -3277,6 +3782,9 @@ components:
           $ref: "#/components/schemas/ItemId"
           description: If the Item is a Season or an Episode, the parent_id is the id of the Serie or of the Season
           nullable: true
+        tracked:
+          type: boolean
+          description: If the current media is being tracked by Yamtrack
         created_at:
           type: string
           format: date-time
@@ -3299,6 +3807,17 @@ components:
         notes:
           type: string
           nullable: true
+        lists:
+          type: array
+          items:
+            type: object
+            properties:
+              list_id:
+                type: integer
+              # list_name:
+              #   type: string
+              list_item_id:
+                type: integer
     MediaStatus:
       type: integer
       enum:
