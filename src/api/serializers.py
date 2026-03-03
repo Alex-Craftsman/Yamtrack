@@ -17,6 +17,7 @@ from app.models import (
     Season,
 )
 from events.models import Event
+from lists.models import CustomList, CustomListItem
 
 from .changes_history_processor import (
     get_changes_from_diff,
@@ -53,6 +54,7 @@ class StatusField(serializers.Field):
 
 
 class ItemSerializer(serializers.ModelSerializer):
+    # TODO: should serialize also non tracked items
     """Serializer used for item details."""
 
     class Meta:  # noqa: D106
@@ -104,6 +106,7 @@ class ChangesHistoryEntrySerializer(serializers.Serializer):
 
 
 class CompleteEpisodeSerializer(serializers.Serializer):
+    # TODO: should serialize also non tracked items
     """Serializer that builds a CompleteEpisode response."""
 
     def to_representation(self, instance):
@@ -170,6 +173,7 @@ class CompleteEpisodeSerializer(serializers.Serializer):
 
 
 class CompleteMediaSerializer(serializers.Serializer):
+    # TODO: should serialize also non tracked items
     """Serializer that builds a CompleteMedia response."""
 
     def _process_seasons(self, media_metadata):
@@ -274,6 +278,7 @@ class CompleteMediaSerializer(serializers.Serializer):
 
 
 class EpisodeSerializer(serializers.ModelSerializer):
+    # TODO: should serialize also non tracked items
     """Serializer used for Episode items."""
 
     def to_representation(self, instance):
@@ -429,7 +434,58 @@ class InfoSerializer(serializers.Serializer):
         }
 
 
+class ListSerializer(serializers.Serializer):
+    """Serializer used for custom lists."""
+
+    def to_representation(self, instance):
+        """Serialize a CustomList."""
+        item_count = instance.items.count()
+        include_items = True
+        if self.context and "include_items" in self.context:
+            include_items = self.context["include_items"]
+
+        items = []
+
+        if self.context and self.context.get("paginated_items") is not None:
+            items_context = self.context["paginated_items"]
+
+            if isinstance(items_context, dict) and "results" in items_context:
+                items = {
+                    "pagination": items_context.get("pagination", {}),
+                    "results": serialize_data(
+                        items_context.get("results", []),
+                        many=True,
+                        homogeneus=False,
+                    ),
+                }
+            else:
+                items = items_context
+
+        response = {
+            "id": instance.id,
+            "name": instance.name,
+            "description": instance.description,
+            "image": instance.image,
+            "owner": {
+                "id": instance.owner.id,
+                "username": instance.owner.username,
+            },
+            "collaborators": [
+                {"id": collaborator.id, "username": collaborator.username}
+                for collaborator in instance.collaborators.all()
+            ],
+            "items_count": item_count,
+            "latest_update": CustomListItem.objects.get_last_added_date(instance),
+        }
+
+        if include_items:
+            response["items"] = items
+
+        return response
+
+
 class MediaSerializer(serializers.ModelSerializer):
+    # TODO: should serialize also non tracked items
     """Serializer used for media items."""
 
     id = serializers.IntegerField(source="item.id", read_only=True)
@@ -465,6 +521,7 @@ class MixedMediaSerializer(serializers.Serializer):
 
 
 class SeasonSerializer(serializers.ModelSerializer):
+    # TODO: should serialize also non tracked items
     """Serializer used for Season items."""
 
     def to_representation(self, instance):
@@ -511,6 +568,7 @@ serializer_map = {
     BasicMedia: MediaSerializer,
     Book: MediaSerializer,
     Comic: MediaSerializer,
+    CustomList: ListSerializer,
     Episode: EpisodeSerializer,
     Event: EventSerializer,
     Game: MediaSerializer,

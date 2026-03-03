@@ -1,6 +1,7 @@
 import logging
 from urllib.parse import urlencode
 
+from django.db.models import OuterRef, Subquery
 from django.utils.dateparse import parse_date
 from rest_framework.response import Response
 
@@ -18,6 +19,7 @@ from app.models import (
     Movie,
     Season,
 )
+from lists.models import CustomListItem
 from users.models import MediaStatusChoices
 
 logger = logging.getLogger(__name__)
@@ -119,23 +121,31 @@ MEDIA_TYPE_VALID_LIST = list(MEDIA_TYPE_MODEL_MAP.keys())
 
 MAX_RESULT_LIMIT = 200
 
-EXISTING_SORTS = [
+
+MEDIA_EXISTING_SORTS = [
     "start_date",
     "end_date",
 ] + [f.name for f in Item._meta.fields]
 
-SEASONS_ADDITIONAL_SORTS = [
+MEDIA_SEASONS_ADDITIONAL_SORTS = [
     "progress",
 ]
 
-EPISODES_ADDITIONAL_SORTS = [
+MEDIA_EPISODES_ADDITIONAL_SORTS = [
     "progress",
 ]
 
-MANUAL_SORTS = [
+MEDIA_MANUAL_SORTS = [
     "added",
     "updated",
     "itemid",
+]
+
+LIST_SORTS = [
+    "items",
+    "name",
+    "new",
+    "update",
 ]
 
 VALID_SOURCES = {
@@ -256,21 +266,21 @@ def fetch_results_all_types(user, status, sort, search, exclude):
 def get_sorts(media_type, *, sort_type="all"):
     """Return the list of valid sorts for complete media types."""
     if sort_type == "all":
-        sort_list = EXISTING_SORTS.copy()
+        sort_list = MEDIA_EXISTING_SORTS.copy()
         if media_type == MediaTypes.SEASON.value:
-            sort_list += SEASONS_ADDITIONAL_SORTS
+            sort_list += MEDIA_SEASONS_ADDITIONAL_SORTS
         if media_type == MediaTypes.EPISODE.value:
-            sort_list += EPISODES_ADDITIONAL_SORTS
-        sort_list += MANUAL_SORTS
+            sort_list += MEDIA_EPISODES_ADDITIONAL_SORTS
+        sort_list += MEDIA_MANUAL_SORTS
         return sort_list
     if sort_type == "manual":
-        return MANUAL_SORTS
+        return MEDIA_MANUAL_SORTS
     if sort_type == "existing":
-        sort_list = EXISTING_SORTS.copy()
+        sort_list = MEDIA_EXISTING_SORTS.copy()
         if media_type == MediaTypes.SEASON.value:
-            sort_list += SEASONS_ADDITIONAL_SORTS
+            sort_list += MEDIA_SEASONS_ADDITIONAL_SORTS
         if media_type == MediaTypes.EPISODE.value:
-            sort_list += EPISODES_ADDITIONAL_SORTS
+            sort_list += MEDIA_EPISODES_ADDITIONAL_SORTS
         return sort_list
     return []
 
@@ -479,7 +489,7 @@ def validate_body(body, media_type):
 
 
 def parse_sort_filter(sort_filter):
-    """Return (sort, sort_order) tuple from a sort_filter string like 'title_desc'."""
+    """Parse a sort_filter string into (field, direction) tuple."""
     if sort_filter and sort_filter != "":
         parts = sort_filter.split("_", 1)
         if len(parts) == 2:  # noqa: PLR2004
@@ -542,3 +552,29 @@ def apply_aggregated_sort(results, sort):
         )
     results.sort(key=_AGGREGATED_SORT_KEYS[sort])
     return results
+
+
+def apply_list_sort(queryset, sort, sort_order):
+    """Apply sorting to a List."""
+    if not sort:
+        return queryset
+
+    if sort not in LIST_SORTS:
+        return None
+
+    sort = "id" if sort == "new" else sort
+
+    ordering = ("-" if sort_order == "desc" else "") + sort
+
+    if sort == "update":
+        return queryset.annotate(
+            update=Subquery(
+                CustomListItem.objects.filter(
+                    custom_list=OuterRef("pk"),
+                )
+                .order_by("-date_added")
+                .values("date_added")[:1],
+            ),
+        ).order_by(ordering, "name")
+
+    return queryset.order_by(ordering)

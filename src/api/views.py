@@ -2,8 +2,10 @@ from calendar import monthrange
 from datetime import date
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import IntegrityError
+from django.db.models import Q
 from django.utils.timezone import datetime, localdate, make_aware
 from health_check.mixins import CheckMixin
 from rest_framework import permissions
@@ -24,6 +26,7 @@ from app.statistics import (
 )
 from events import tasks
 from events.models import Event
+from lists.models import CustomList, CustomListItem
 from users.models import MediaStatusChoices
 
 from .changes_history_processor import (
@@ -33,12 +36,15 @@ from .changes_history_processor import (
 )
 from .helpers import (
     MEDIA_TYPE_COMPLETE_MODEL_MAP,
+    apply_aggregated_sort,
+    apply_list_sort,
     check_source_type,
     check_valid_type,
     fetch_results_all_types,
     fetch_results_for_type,
     get_http_message,
     get_media_status,
+    get_sorts,
     make_page_url,
     paginate_data,
     parse_excluded_items,
@@ -62,7 +68,7 @@ from .serializers import (
     serialize_data,
 )
 
-# TODO!: check sorters and filters in paginate_data since data is not serialized yet.
+# TODO!: check sorters and filters in paginate_data since data is not serialized yet. Maybe data should be serialized first and then sorted/paginated later?? Sorting/filtering should occur at db search level, pagination should be done right after, always at the db search level, then the data should be serialized.
 
 # TODO!: for children items, it should return an error if user is trying to access a non existing season/episode (for example if it's requested the season 4 of a 2 season show)
 
@@ -71,6 +77,12 @@ from .serializers import (
 # TODO: Implement global search endpoint for every media_type
 
 # TODO: Implement admin commands to manage users (add admins, remove/add users, etc)
+
+# TODO: Implement better error messages ({"detail": get_http_message(404) + "error_description")
+
+# TODO: Move operations on db to `models` file of the relative django app
+
+# TODO!!: since it's possible to add to lists untracked items, the id field can be null, so it's impossible to get these elements from the list, while it should be possible. The untracked added element is in the Items table, but not in the media tables.
 
 
 # /api/v1/calendar/
@@ -249,12 +261,106 @@ class InfoView(drf_views.APIView):
 
 
 # /api/v1/lists/
-class ListsView(drf_views.APIView):  # noqa: D101
-    def get(self, request):  # noqa: ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+class ListsView(drf_views.APIView):
+    """Lists view."""
 
-    def post(self, request):  # noqa: ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Retrieve the lists for the authenticated user."""
+        user = request.user
+        search = request.GET.get("search", "")
+        sort_filter = request.GET.get("sort", "")
+
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
+        custom_lists = CustomList.objects.get_user_lists(user)
+        # TODO: move to lists/models.py
+        if search:
+            custom_lists = custom_lists.filter(
+                Q(name__icontains=search) | Q(description__icontains=search),
+            )
+
+        sort, sort_order = parse_sort_filter(sort_filter)
+        sorted_lists = apply_list_sort(custom_lists, sort, sort_order)
+        if sorted_lists is None:
+            return Response(
+                {"detail": f"{get_http_message(404)} Invalid sorting"},
+                status=404,
+            )
+
+        paginated_data = paginate_data(request, sorted_lists, limit, offset)
+        serialized_data = serialize_data(
+            paginated_data["results"],
+            many=True,
+            context={"include_items": False},
+        )
+        paginated_data["results"] = serialized_data
+        return Response(paginated_data, status=200)
+
+    def post(self, request):
+        """Create a new custom list for the authenticated user."""
+        user = request.user
+        body = request.data
+
+        if not body:
+            return Response(
+                {"detail": f"{get_http_message(400)} Missing body."},
+                status=400,
+            )
+
+        name = body.get("name", "").strip()
+        if not name:
+            return Response(
+                {"detail": f"{get_http_message(400)} Field 'name' is required."},
+                status=400,
+            )
+        description = body.get("description", "")
+        collaborator_ids = body.get("collaborators", [])
+
+        if collaborator_ids and not isinstance(collaborator_ids, list):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Field 'collaborators' must be an array of user IDs.",
+                },
+                status=400,
+            )
+
+        try:
+            # TODO: move to lists/models.py
+            custom_list = CustomList.objects.create(
+                name=name,
+                description=description,
+                owner=user,
+            )
+
+            if collaborator_ids:
+                collaborators = get_user_model().objects.filter(id__in=collaborator_ids)
+
+                if collaborators.count() != len(collaborator_ids):
+                    custom_list.delete()
+                    return Response(
+                        {
+                            "detail": f"{get_http_message(400)} One or more collaborator IDs are invalid.",
+                        },
+                        status=400,
+                    )
+
+                custom_list.collaborators.set(collaborators)
+
+            serialized_data = serialize_data(
+                custom_list,
+                context={"include_items": False},
+            )
+            return Response(serialized_data, status=201)
+
+        except Exception as e:  # noqa: BLE001
+            return Response(
+                {"detail": f"{get_http_message(500)}", "errors": str(e)},
+                status=500,
+            )
 
 
 # /api/v1/lists/[id]/
