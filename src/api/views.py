@@ -1458,6 +1458,10 @@ class MediaListsView(drf_views.APIView):
         """Retrieve the lists that a specific media is in."""
         user = request.user
 
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
         if not check_valid_type(media_type):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
@@ -1471,6 +1475,123 @@ class MediaListsView(drf_views.APIView):
                 },
                 status=400,
             )
+
+        lists = get_item_lists_payload(user, media_id, source, media_type)
+        paginated_data = paginate_data(request, lists, limit, offset)
+
+        return Response(paginated_data, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/lists/[list_id]/
+class MediaListDetailView(drf_views.APIView):
+    """Media list detail view."""
+
+    def delete(self, request, media_type, source, media_id, list_id):
+        """Remove a specific media from a specific list."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_edit(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        try:
+            list_item = user_list.get_list_item_by_media(
+                media_id,
+                source,
+                media_type,
+            )
+        except CustomListItem.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found in the list."},
+                status=404,
+            )
+
+        list_item.delete()
+        return Response(status=204)
+
+    def put(self, request, media_type, source, media_id, list_id):
+        """Add a specific media to a specific list."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_edit(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        try:
+            item = Item.objects.get(
+                media_id=media_id,
+                source=source,
+                media_type=media_type,
+            )
+        except Item.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found."},
+                status=404,
+            )
+
+        if user_list.items.filter(id=item.id).exists():
+            return Response(
+                {"detail": f"{get_http_message(409)} Media already in the list."},
+                status=409,
+            )
+
+        user_list.items.add(item)
 
         lists = get_item_lists_payload(user, media_id, source, media_type)
 
@@ -2327,6 +2448,10 @@ class MediaSeasonListsView(drf_views.APIView):
         """Retrieve the lists that a specific season is in."""
         user = request.user
 
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
         if not check_valid_type(media_type):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
@@ -2350,7 +2475,158 @@ class MediaSeasonListsView(drf_views.APIView):
             )
 
         lists = get_item_lists_payload(
-            user, media_id, source, "season", season_number=season_number
+            user,
+            media_id,
+            source,
+            "season",
+            season_number=season_number,
+        )
+        paginated_data = paginate_data(request, lists, limit, offset)
+
+        return Response(paginated_data, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/lists/[list_id]/
+class MediaSeasonListDetailView(drf_views.APIView):
+    """Season list detail view."""
+
+    def delete(self, request, media_type, source, media_id, season_number, list_id):
+        """Remove a specific season from a specific list."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_edit(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        try:
+            item = Item.objects.get(
+                media_id=media_id,
+                source=source,
+                media_type="season",
+                season_number=season_number,
+            )
+        except Item.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found."},
+                status=404,
+            )
+
+        if not user_list.items.filter(id=item.id).exists():
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found in the list."},
+                status=404,
+            )
+
+        user_list.items.remove(item)
+        return Response(status=204)
+
+    def put(self, request, media_type, source, media_id, season_number, list_id):
+        """Add a specific season to a specific list."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_edit(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        try:
+            item = Item.objects.get(
+                media_id=media_id,
+                source=source,
+                media_type="season",
+                season_number=season_number,
+            )
+        except Item.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found."},
+                status=404,
+            )
+
+        if user_list.items.filter(id=item.id).exists():
+            return Response(
+                {"detail": f"{get_http_message(409)} Media already in the list."},
+                status=409,
+            )
+
+        user_list.items.add(item)
+
+        lists = get_item_lists_payload(
+            user,
+            media_id,
+            source,
+            media_type,
+            season_number=season_number,
         )
 
         return Response(lists, status=200)
@@ -3130,6 +3406,10 @@ class MediaEpisodeListsView(drf_views.APIView):
         """Retrieve the lists that a specific season is in."""
         user = request.user
 
+        limit, offset, err = parse_limit_offset(request)
+        if err:
+            return err
+
         if not check_valid_type(media_type):
             return Response(
                 {"detail": f"{get_http_message(400)} Unsupported media type."},
@@ -3157,6 +3437,174 @@ class MediaEpisodeListsView(drf_views.APIView):
             media_id,
             source,
             "episode",
+            season_number=season_number,
+            episode_number=episode_number,
+        )
+        paginated_data = paginate_data(request, lists, limit, offset)
+
+        return Response(paginated_data, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/lists/[list_id]/
+class MediaEpisodeListDetailView(drf_views.APIView):
+    """Episode list detail view."""
+
+    def delete(
+        self,
+        request,
+        media_type,
+        source,
+        media_id,
+        season_number,
+        episode_number,
+        list_id,
+    ):
+        """Remove a specific episode from a specific list."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_edit(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        try:
+            item = Item.objects.get(
+                media_id=media_id,
+                source=source,
+                media_type="episode",
+                season_number=season_number,
+                episode_number=episode_number,
+            )
+        except Item.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found."},
+                status=404,
+            )
+
+        if not user_list.items.filter(id=item.id).exists():
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found in the list."},
+                status=404,
+            )
+
+        user_list.items.remove(item)
+        return Response(status=204)
+
+    def put(
+        self,
+        request,
+        media_type,
+        source,
+        media_id,
+        season_number,
+        episode_number,
+        list_id,
+    ):
+        """Add a specific episode to a specific list."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        try:
+            user_list = (
+                CustomList.objects.select_related("owner")
+                .prefetch_related("items")
+                .get(id=list_id)
+            )
+        except CustomList.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} List not found."},
+                status=404,
+            )
+
+        if not user_list.user_can_edit(user):
+            return Response(
+                {"detail": f"{get_http_message(403)}"},
+                status=403,
+            )
+
+        try:
+            item = Item.objects.get(
+                media_id=media_id,
+                source=source,
+                media_type="episode",
+                season_number=season_number,
+                episode_number=episode_number,
+            )
+        except Item.DoesNotExist:
+            return Response(
+                {"detail": f"{get_http_message(404)} Media not found."},
+                status=404,
+            )
+
+        if user_list.items.filter(id=item.id).exists():
+            return Response(
+                {"detail": f"{get_http_message(409)} Media already in the list."},
+                status=409,
+            )
+
+        user_list.items.add(item)
+
+        lists = get_item_lists_payload(
+            user,
+            media_id,
+            source,
+            media_type,
             season_number=season_number,
             episode_number=episode_number,
         )

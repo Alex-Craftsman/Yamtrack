@@ -64,6 +64,11 @@ urlpatterns = [
         name="api_media_lists",
     ),
     re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/lists/(?P<list_id>\d+)/?$",
+        views.MediaListDetailView.as_view(),
+        name="api_media_lists",
+    ),
+    re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/recommendations/?$",
         views.MediaRecommendationsView.as_view(),
         name="api_media_recommendations",
@@ -109,6 +114,11 @@ urlpatterns = [
         name="api_media_season_lists",
     ),
     re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/lists/(?P<list_id>\d+)/?$",
+        views.MediaSeasonListDetailView.as_view(),
+        name="api_media_season_list_detail",
+    ),
+    re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/sync/?$",
         views.MediaSeasonSyncView.as_view(),
         name="api_media_season_sync",
@@ -137,6 +147,11 @@ urlpatterns = [
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/lists/?$",
         views.MediaEpisodeListsView.as_view(),
         name="api_media_episode_lists",
+    ),
+    re_path(
+        r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/lists/(?P<list_id>\d+)/?$",
+        views.MediaEpisodeListDetailView.as_view(),
+        name="api_media_episode_list_detail",
     ),
     re_path(
         r"^media/(?P<media_type>[^/]+)/(?P<source>[^/]+)/(?P<media_id>\d+)/(?P<season_number>\d+)/(?P<episode_number>\d+)/sync/?$",
