@@ -1,7 +1,7 @@
 import logging
 from urllib.parse import urlencode
 
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Q, Subquery
 from django.utils.dateparse import parse_date
 from rest_framework.response import Response
 
@@ -178,6 +178,31 @@ def build_item_id(item):
     return f"{media_type}/{item.source}/{item.media_id}{children}"
 
 
+# TODO: move to lists/models.py
+def build_lists_by_item_id(user, objects):
+    """Build a map of item id to list membership payload for serializer context."""
+    lists_by_item_id = {}
+
+    for obj in objects:
+        item = obj if isinstance(obj, Item) else getattr(obj, "item", None)
+        if item is None:
+            continue
+
+        if item.id in lists_by_item_id:
+            continue
+
+        lists_by_item_id[item.id] = get_item_lists_payload(
+            user,
+            item.media_id,
+            item.source,
+            item.media_type,
+            season_number=item.season_number,
+            episode_number=item.episode_number,
+        )
+
+    return lists_by_item_id
+
+
 def build_parent_id(item):
     """Build the parent_id string for seasons and episodes."""
     if not item:
@@ -261,6 +286,46 @@ def fetch_results_all_types(user, status, sort, search, exclude):
             return None, True
 
     return results, False
+
+
+# TODO: move to lists/models.py
+def get_item_lists_payload(
+    user,
+    media_id,
+    source,
+    media_type,
+    *,
+    season_number=None,
+    episode_number=None,
+):
+    """Return list membership payload for an item following API schema."""
+    item = Item.objects.filter(
+        media_id=media_id,
+        source=source,
+        media_type=media_type,
+        season_number=season_number,
+        episode_number=episode_number,
+    ).first()
+
+    if item is None or user is None:
+        return []
+
+    custom_list_items = (
+        CustomListItem.objects.filter(item=item)
+        .filter(
+            Q(custom_list__owner=user) | Q(custom_list__collaborators=user),
+        )
+        .order_by("custom_list_id", "list_item_id")
+        .distinct()
+    )
+
+    return [
+        {
+            "list_id": custom_list_item.custom_list_id,
+            "list_item_id": custom_list_item.list_item_id,
+        }
+        for custom_list_item in custom_list_items
+    ]
 
 
 def get_sorts(media_type, *, sort_type="all"):

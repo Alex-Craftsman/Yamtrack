@@ -38,11 +38,13 @@ from .helpers import (
     MEDIA_TYPE_COMPLETE_MODEL_MAP,
     apply_aggregated_sort,
     apply_list_sort,
+    build_lists_by_item_id,
     check_source_type,
     check_valid_type,
     fetch_results_all_types,
     fetch_results_for_type,
     get_http_message,
+    get_item_lists_payload,
     get_media_status,
     get_sorts,
     make_page_url,
@@ -139,7 +141,7 @@ class CalendarView(drf_views.APIView):
 
         try:
             releases = Event.objects.get_user_events(request.user, first_day, last_day)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": f"{get_http_message(500)}", "errors": str(e)},
                 status=500,
@@ -192,7 +194,7 @@ class MediaTypeChangesHistoryDetailView(drf_views.APIView):
                 serializer_class=ChangesHistoryEntrySerializer,
             )
             return Response(serialized_data, status=200)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {
                     "detail": f"{get_http_message(404)} History record not found",
@@ -212,7 +214,7 @@ class MediaTypeChangesHistoryDetailView(drf_views.APIView):
         try:
             delete_changes_history_entry(media_type, history_id, request.user)
             return Response({"detail": "Record removed correctly"}, status=204)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {
                     "detail": f"{get_http_message(404)} History record not found",
@@ -229,7 +231,7 @@ class HealthView(CheckMixin, drf_views.APIView):
     authentication_classes = []
     permission_classes = []
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):  # noqa: ARG002
         """Check API health status."""
         errors = self.errors
         plugins = self.plugins
@@ -252,7 +254,7 @@ class InfoView(drf_views.APIView):
     authentication_classes = []
     permission_classes = []
 
-    def get(self, request):
+    def get(self, request):  # noqa: ARG002
         """Get application information."""
         info_data = {}
         response_data = serialize_data(
@@ -455,9 +457,13 @@ class ListDetailView(drf_views.APIView):
                 media_objects.reverse()
 
         paginated_data = paginate_data(request, media_objects, limit, offset)
+        lists_by_item_id = build_lists_by_item_id(user, paginated_data["results"])
         serialized_list = serialize_data(
             user_list,
-            context={"paginated_items": paginated_data},
+            context={
+                "paginated_items": paginated_data,
+                "lists_by_item_id": lists_by_item_id,
+            },
         )
 
         return Response(serialized_list, status=200)
@@ -583,12 +589,14 @@ class ListItemsView(drf_views.APIView):
                 media_objects.reverse()
 
         paginated_data = paginate_data(request, media_objects, limit, offset)
-        # TODO: status field is always `none`
-        # TODO: should add the `tracked` boolean to the serialization
+        lists_by_item_id = build_lists_by_item_id(user, paginated_data["results"])
         serialized_data = serialize_data(
             paginated_data["results"],
             many=True,
-            context={"serialize_items_as_media": True},
+            context={
+                "serialize_items_as_media": True,
+                "lists_by_item_id": lists_by_item_id,
+            },
             homogeneous=False,
         )
         paginated_data["results"] = serialized_data
@@ -761,9 +769,15 @@ class MediaListView(drf_views.APIView):
             results.reverse()
 
         paginated_data = paginate_data(request, results, limit, offset)
+        # TODO: see if this can be optimized with a single query for all medias instead of one per episode
+        # TODO: see if lists infos can be saved in the `results` object to avoid using `context` to pass additional parameters
+        lists_by_item_id = build_lists_by_item_id(user, paginated_data["results"])
         serialized_data = serialize_data(
             paginated_data["results"],
-            context={"request": request},
+            context={
+                "request": request,
+                "lists_by_item_id": lists_by_item_id,
+            },
             many=True,
             homogeneous=False,
         )
@@ -780,7 +794,6 @@ class MediaTypeListView(drf_views.APIView):
 
     def get(self, request, media_type):
         """Retrieve the list of media of a specific media type."""
-        # TODO: handle multiple consumptions of the same media item
         user = request.user
         status = request.GET.get("status", "")
         search = request.GET.get("search", "")
@@ -824,9 +837,15 @@ class MediaTypeListView(drf_views.APIView):
             results.reverse()
 
         paginated_data = paginate_data(request, results, limit, offset)
+        # TODO: see if this can be optimized with a single query for all medias instead of one per episode
+        # TODO: see if lists infos can be saved in the `results` object to avoid using `context` to pass additional parameters
+        lists_by_item_id = build_lists_by_item_id(user, paginated_data["results"])
         serialized_data = serialize_data(
             paginated_data["results"],
-            context={"request": request},
+            context={
+                "request": request,
+                "lists_by_item_id": lists_by_item_id,
+            },
             many=True,
         )
         paginated_data["results"] = serialized_data
@@ -919,7 +938,7 @@ class MediaTypeListView(drf_views.APIView):
                 source,
                 [season_number],
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": f"{get_http_message(500)}", "errors": str(e)},
                 status=500,
@@ -936,7 +955,7 @@ class MediaTypeListView(drf_views.APIView):
 
         try:
             item.save()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": "Internal Server Error.", "errors": str(e)},
                 status=500,
@@ -1062,9 +1081,12 @@ class MediaDetailView(drf_views.APIView):
         ):
             media_metadata["related"].pop("recommendations")
 
+        lists = get_item_lists_payload(user, media_id, source, media_type)
+
         data = {
             "media_metadata": media_metadata,
             "user_medias": user_medias,
+            "lists": lists,
         }
 
         serialized = serialize_data(
@@ -1151,9 +1173,12 @@ class MediaDetailView(drf_views.APIView):
         ):
             media_metadata["related"].pop("recommendations")
 
+        lists = get_item_lists_payload(user, media_id, source, media_type)
+
         data = {
             "media_metadata": media_metadata,
             "user_medias": user_medias,
+            "lists": lists,
         }
 
         serialized = serialize_data(
@@ -1484,6 +1509,7 @@ class MediaSeasonsView(drf_views.APIView):
 
     def get(self, request, media_type, source, media_id):
         """Retrieve the history timeline for a specific media."""
+        user = request.user
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
@@ -1527,9 +1553,24 @@ class MediaSeasonsView(drf_views.APIView):
             seasons = media_metadata["related"]["seasons"]
 
         paginated_data = paginate_data(request, seasons, limit, offset)
+        lists_by_season = {}
+        for season in paginated_data["results"]:
+            season_number = season.get("season_number")
+            if season_number is None:
+                continue
+
+            lists_by_season[season_number] = get_item_lists_payload(
+                user,
+                media_id,
+                source,
+                MediaTypes.SEASON.value,
+                season_number=season_number,
+            )
+
         paginated_data["results"] = serialize_data(
             paginated_data["results"],
             many=True,
+            context={"lists_by_season": lists_by_season},
             serializer_class=SeasonSerializer,
         )
         return Response(paginated_data, status=200)
@@ -1662,7 +1703,6 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=404,
             )
 
-        # TODO: Handle better reconsumptions
         for media in user_medias:
             media.delete()
 
@@ -1729,13 +1769,23 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=500,
             )
 
+        lists = get_item_lists_payload(
+            user,
+            media_id,
+            source,
+            "season",
+            season_number=season_number,
+        )
+
         data = {
             "media_metadata": media_metadata,
             "user_medias": user_medias,
+            "lists": lists,
         }
 
         serialized = serialize_data(
             data,
+            context={"request": request},
             serializer_class=CompleteMediaSerializer,
         )
         return Response(serialized, status=200)
@@ -1825,9 +1875,18 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=500,
             )
 
+        lists = get_item_lists_payload(
+            user,
+            media_id,
+            source,
+            "season",
+            season_number=season_number,
+        )
+
         data = {
             "media_metadata": media_metadata,
             "user_medias": user_medias,
+            "lists": lists,
         }
 
         serialized = serialize_data(
@@ -1890,7 +1949,7 @@ class MediaSeasonChangesHistoryView(drf_views.APIView):
         paginated_data["results"] = serialize_data(
             paginated_data["results"],
             many=True,
-            context={"request": request, "media_type": media_type},
+            context={"media_type": media_type},
             serializer_class=ChangesHistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
@@ -1904,6 +1963,7 @@ class MediaSeasonEpisodesView(drf_views.APIView):
 
     def get(self, request, media_type, source, media_id, season_number):
         """Retrieve the episodes for a specific season of a tv serie."""
+        user = request.user
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
@@ -1948,10 +2008,30 @@ class MediaSeasonEpisodesView(drf_views.APIView):
             episodes = media_metadata["episodes"]
 
         paginated = paginate_data(request, episodes, limit, offset)
+
+        # TODO: see if this can be optimized with a single query for all episodes instead of one per episode
+        # TODO: see if lists infos can be saved in the `episodes` object to avoid using `context` to pass additional parameters
+        lists_by_episode = {}
+        for episode in paginated["results"]:
+            episode_number = episode.get("episode_number")
+            if episode_number is None:
+                continue
+            lists_by_episode[episode_number] = get_item_lists_payload(
+                user,
+                media_id,
+                source,
+                "episode",
+                season_number=season_number,
+                episode_number=episode_number,
+            )
+
         paginated["results"] = serialize_data(
             paginated["results"],
             many=True,
-            context={"source": source},
+            context={
+                "source": source,
+                "lists_by_episode": lists_by_episode,
+            },
             serializer_class=EpisodeSerializer,
         )
         return Response(paginated, status=200)
@@ -2401,7 +2481,6 @@ class MediaEpisodeDetailView(drf_views.APIView):
                 status=404,
             )
 
-        # TODO: Handle better reconsumptions
         for media in user_medias:
             media.delete()
 
@@ -2486,10 +2565,20 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
         media_metadata.pop("episodes")
 
+        lists = get_item_lists_payload(
+            user,
+            media_id,
+            source,
+            "episode",
+            season_number=season_number,
+            episode_number=episode_number,
+        )
+
         data = {
             "media_metadata": media_metadata,
             "episode": episode,
             "user_medias": user_medias,
+            "lists": lists,
         }
 
         serialized = serialize_data(
@@ -2616,12 +2705,20 @@ class MediaEpisodeDetailView(drf_views.APIView):
                     status=404,
                 )
 
-        media_metadata.pop("episodes")
+        lists = get_item_lists_payload(
+            user,
+            media_id,
+            source,
+            "episode",
+            season_number=season_number,
+            episode_number=episode_number,
+        )
 
         data = {
             "media_metadata": media_metadata,
             "episode": episode,
             "user_medias": user_medias,
+            "lists": lists,
         }
 
         serialized = serialize_data(
