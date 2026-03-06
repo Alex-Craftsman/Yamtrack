@@ -10,17 +10,19 @@ class BearerAuthentication(BaseAuthentication):
     keyword = "Bearer"
 
     def authenticate(self, request):
+        """Authenticate the user with Bearer token."""
         auth = request.headers.get("Authorization")
         if not auth:
             return None
         parts = auth.split()
-        if len(parts) != 2 or parts[0] != self.keyword:
+        if len(parts) != 2 or parts[0] != self.keyword:  # noqa: PLR2004
             return None
         token = parts[1]
         try:
             user = User.objects.get(token=token)
         except User.DoesNotExist:
-            raise AuthenticationFailed("Invalid token")
+            msg = "Invalid token"
+            raise AuthenticationFailed(msg) from None
         return (user, None)
 
 
@@ -28,11 +30,13 @@ class APIKeyAuthentication(BaseAuthentication):
     """API Key Authentication."""
 
     def authenticate(self, request):
+        """Authenticate the user with API Key."""
         auth = request.headers.get("X-API-Key")
         if not auth:
             return None
         try:
             user = User.objects.get(token=auth)
         except User.DoesNotExist:
-            raise AuthenticationFailed("Invalid token")
+            msg = "Invalid token"
+            raise AuthenticationFailed(msg) from None
         return (user, None)

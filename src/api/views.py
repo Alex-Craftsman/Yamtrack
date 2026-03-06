@@ -3701,7 +3701,7 @@ class SearchProviderView(drf_views.APIView):
 
                 page += 1
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {"detail": f"{get_http_message(500)}", "errors": str(e)},
                 status=500,

@@ -490,7 +490,7 @@ def _validate_score(filtered_body):
     """Validate and convert score field."""
     try:
         score_value = float(filtered_body["score"])
-        if score_value < 0 or score_value > 10:
+        if score_value < 0 or score_value > 10:  # noqa: PLR2004
             return None, "Score must be between 0 and 10."
         filtered_body["score"] = score_value
     except (TypeError, ValueError):
