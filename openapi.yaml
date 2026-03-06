@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.18
+  version: 0.0.19
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -1391,59 +1391,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-    post:
-      tags:
-        - lists
-      summary: Add the item's Item to a list
-      parameters:
-        - in: path
-          name: media_type
-          required: true
-          schema:
-            $ref: "#/components/schemas/MediaTypes"
-        - in: path
-          name: source
-          required: true
-          schema:
-            $ref: "#/components/schemas/Source"
-        - in: path
-          name: media_id
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "204":
-          description: Added
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/lists/{list_id}:
     delete:
       tags:
@@ -2240,6 +2187,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/lists/:
+    get:
+      tags:
+        - lists
+      summary: List lists that the season item belongs to
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedLists"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/sync/:
     post:
       tags:
@@ -2839,6 +2843,68 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/lists/:
+    get:
+      tags:
+        - lists
+      summary: List lists that the episode item belongs to
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedLists"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/sync/:
     post:
       tags:
@@ -3260,16 +3326,7 @@ components:
           items:
             $ref: "#/components/schemas/ConsumptionInfos"
         lists:
-          type: array
-          items:
-            type: object
-            properties:
-              list_id:
-                type: integer
-              # list_name:
-              #   type: string
-              list_item_id:
-                type: integer
+          $ref: "#/components/schemas/ListsMinimized"
     ConsumptionInfos:
       type: object
       properties:
@@ -3689,6 +3746,17 @@ components:
         latest_update:
           type: string
           format: timestamp
+    ListsMinimized:
+      type: array
+      items:
+        type: object
+        properties:
+          list_id:
+            type: integer
+          # list_name:
+          #   type: string
+          list_item_id:
+            type: integer
     ListsSortOptions:
       type: string
       enum:
@@ -3811,16 +3879,7 @@ components:
           type: string
           nullable: true
         lists:
-          type: array
-          items:
-            type: object
-            properties:
-              list_id:
-                type: integer
-              # list_name:
-              #   type: string
-              list_item_id:
-                type: integer
+          $ref: "#/components/schemas/ListsMinimized"
     MediaStatus:
       type: integer
       enum:
@@ -3927,7 +3986,7 @@ components:
         results:
           type: array
           items:
-            $ref: "#/components/schemas/List"
+            $ref: "#/components/schemas/ListsMinimized"
     PaginatedMedia:
       type: object
       properties:

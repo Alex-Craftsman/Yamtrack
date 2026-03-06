@@ -1451,12 +1451,30 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/lists/
-class MediaAddToListView(drf_views.APIView):  # noqa: D101
-    def post(self, request, media_type, source, media_id):  # noqa: ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+class MediaListsView(drf_views.APIView):
+    """Media lists view."""
 
-    def delete(self, request, media_type, source, media_id):  # noqa: ARG002, D102
-        return Response({"detail": f"{get_http_message(501)}"}, status=501)
+    def get(self, request, media_type, source, media_id):
+        """Retrieve the lists that a specific media is in."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        lists = get_item_lists_payload(user, media_id, source, media_type)
+
+        return Response(lists, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/recommendations/
@@ -2301,6 +2319,43 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
         return Response(serialized_data, status=200)
 
 
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/lists/
+class MediaSeasonListsView(drf_views.APIView):
+    """Season lists view."""
+
+    def get(self, request, media_type, source, media_id, season_number):
+        """Retrieve the lists that a specific season is in."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        lists = get_item_lists_payload(
+            user, media_id, source, "season", season_number=season_number
+        )
+
+        return Response(lists, status=200)
+
+
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/sync/
 class MediaSeasonSyncView(drf_views.APIView):
     """Sync season."""
@@ -3065,6 +3120,48 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
             serializer_class=HistorySerializer,
         )
         return Response(serialized_data, status=200)
+
+
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/lists/
+class MediaEpisodeListsView(drf_views.APIView):
+    """Episode lists view."""
+
+    def get(self, request, media_type, source, media_id, season_number, episode_number):
+        """Retrieve the lists that a specific season is in."""
+        user = request.user
+
+        if not check_valid_type(media_type):
+            return Response(
+                {"detail": f"{get_http_message(400)} Unsupported media type."},
+                status=400,
+            )
+
+        if media_type != MediaTypes.TV.value:
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Seasons are supported only for 'tv' media type.",
+                },
+                status=400,
+            )
+
+        if not check_source_type(media_type, source):
+            return Response(
+                {
+                    "detail": f"{get_http_message(400)} Cannot query `{source}` for `{media_type}` media type",
+                },
+                status=400,
+            )
+
+        lists = get_item_lists_payload(
+            user,
+            media_id,
+            source,
+            "episode",
+            season_number=season_number,
+            episode_number=episode_number,
+        )
+
+        return Response(lists, status=200)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/sync/
