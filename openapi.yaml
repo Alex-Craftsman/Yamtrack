@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.17
+  version: 0.0.18
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -3774,6 +3774,9 @@ components:
         id:
           type: integer
           description: The id of the item in the database (not to be confused with the item_id, which is media provider specific)
+        consumption_id:
+          type: integer
+          description: The id of the media consumption (id numbers are global for all consumptions of all medias of the same type, not sequential per media)
         item:
           $ref: "#/components/schemas/Item"
         item_id:
