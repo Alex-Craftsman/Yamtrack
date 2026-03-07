@@ -79,8 +79,6 @@ from .serializers import (
 
 # TODO: Implement admin commands to manage users (add admins, remove/add users, etc)
 
-# TODO: Implement better error messages ({"detail": get_http_message(404) + "error_description")
-
 # TODO: Move operations on db to `models` file of the relative django app
 
 # TODO!!: since it's possible to add to lists untracked items, the id field can be null, so it's impossible to get these elements from the list, while it should be possible. The untracked added element is in the Items table, but not in the media tables.
