@@ -47,7 +47,6 @@ from .helpers import (
     get_item_lists_payload,
     get_media_status,
     get_sorts,
-    make_page_url,
     paginate_data,
     parse_excluded_items,
     parse_limit_offset,
@@ -3713,28 +3712,15 @@ class SearchProviderView(drf_views.APIView):
             else len(results_accum)
         )
 
-        # TODO: use pagination helpers
-        sliced = results_accum[offset : offset + limit]
-        next_url = None
-        prev_url = None
-        if offset + limit < (total or len(results_accum)):
-            next_url = make_page_url(request, limit, offset + limit)
-        if offset > 0:
-            prev_offset = max(0, offset - limit)
-            prev_url = make_page_url(request, limit, prev_offset)
-
-        payload = {
-            "pagination": {
-                "total": total or len(results_accum),
-                "limit": limit,
-                "offset": offset,
-                "next": next_url,
-                "previous": prev_url,
-            },
-            "results": sliced,
-        }
-
-        return Response(payload, status=200)
+        resolved_total = total or len(results_accum)
+        paginated_data = paginate_data(
+            request,
+            results_accum,
+            limit,
+            offset,
+            total=resolved_total,
+        )
+        return Response(paginated_data, status=200)
 
 
 # /api/v1/statistics/

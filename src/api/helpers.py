@@ -378,27 +378,27 @@ def make_page_url(request, limit, new_offset):
     return request.build_absolute_uri(request.path + "?" + urlencode(params))
 
 
-def paginate_data(request, results, limit, offset):
+def paginate_data(request, results, limit, offset, *, total=None):
     """Paginate the results based on the limit and offset.
 
     Returns raw paginated data without serialization.
     Serialization should be handled by the view.
     """
-    total = len(results)
+    total_count = len(results) if total is None else total
     start = offset
     end = offset + limit
     paginated = results[start:end]
 
     next_url = None
     prev_url = None
-    if end < total:
+    if end < total_count:
         next_url = make_page_url(request, limit, end)
     if start > 0:
         prev_offset = max(0, start - limit)
         prev_url = make_page_url(request, limit, prev_offset)
 
     pagination = {
-        "total": total,
+        "total": total_count,
         "limit": limit,
         "offset": offset,
         "next": next_url,
