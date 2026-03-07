@@ -433,7 +433,7 @@ def parse_limit_offset(request):
                 None,
                 None,
                 Response(
-                    {"detail": f"{get_http_message(400)} Invalid limit parameter"},
+                    {"detail": get_http_message(400) + " Invalid limit parameter"},
                     status=400,
                 ),
             )
@@ -447,17 +447,19 @@ def parse_limit_offset(request):
                 None,
                 None,
                 Response(
-                    {"detail": f"{get_http_message(400)} Invalid offset parameter"},
+                    {"detail": get_http_message(400) + " Invalid offset parameter"},
                     status=400,
                 ),
             )
     if limit <= 0 or offset < 0:
+        # TODO: use raise instead of returning the error
         return (
             None,
             None,
             Response(
                 {
-                    "detail": f"{get_http_message(400)} limit must be >0 and offset must be >=0",
+                    "detail": get_http_message(400)
+                    + " limit must be >0 and offset must be >=0",
                 },
                 status=400,
             ),
@@ -622,7 +624,7 @@ def apply_manual_sort_for_type(results, sort):
     """Apply manual sorts used when a single media type is requested."""
     if sort not in _AGGREGATED_MANUAL_SORT_KEYS:
         return Response(
-            {"detail": f"{get_http_message(400)} Invalid sorting"},
+            {"detail": get_http_message(400) + " Invalid sorting"},
             status=400,
         )
     return results
@@ -647,7 +649,7 @@ def apply_aggregated_sort(results, sort):
     """Apply sorting for the aggregated (multi-type) results."""
     if sort not in _AGGREGATED_SORT_KEYS:
         return Response(
-            {"detail": f"{get_http_message(400)} Bad Request. Invalid sorting"},
+            {"detail": get_http_message(400) + " Invalid sorting"},
             status=400,
         )
     results.sort(key=_AGGREGATED_SORT_KEYS[sort])
