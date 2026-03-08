@@ -284,12 +284,7 @@ class ListsView(drf_views.APIView):
         if err:
             return err
 
-        custom_lists = CustomList.objects.get_user_lists(user)
-        # TODO: move to lists/models.py
-        if search:
-            custom_lists = custom_lists.filter(
-                Q(name__icontains=search) | Q(description__icontains=search),
-            )
+        custom_lists = CustomList.objects.get_user_lists(user, search=search)
 
         sort, sort_order = parse_sort_filter(sort_filter)
         sorted_lists = apply_list_sort(custom_lists, sort, sort_order)

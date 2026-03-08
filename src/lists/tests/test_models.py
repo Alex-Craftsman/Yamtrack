@@ -189,3 +189,13 @@ class CustomListManagerTest(TestCase):
         self.assertEqual(user_lists.count(), 2)
         self.assertIn(self.list1, user_lists)
         self.assertIn(self.list2, user_lists)
+
+    def test_get_user_lists_with_search(self):
+        """Test get_user_lists applies search on name and description."""
+        self.list1.description = "Track only anime"
+        self.list1.save(update_fields=["description"])
+
+        user_lists = CustomList.objects.get_user_lists(self.user, search="anime")
+
+        self.assertEqual(user_lists.count(), 1)
+        self.assertIn(self.list1, user_lists)

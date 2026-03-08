@@ -8,11 +8,17 @@ from app.models import Item
 class CustomListManager(models.Manager):
     """Manager for custom lists."""
 
-    def get_user_lists(self, user):
+    def get_user_lists(self, user, search=""):
         """Return the custom lists that the user owns or collaborates on."""
+        queryset = self.filter(Q(owner=user) | Q(collaborators=user))
+
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) | Q(description__icontains=search),
+            )
+
         return (
-            self.filter(Q(owner=user) | Q(collaborators=user))
-            .select_related("owner")
+            queryset.select_related("owner")
             .prefetch_related(
                 "collaborators",
                 Prefetch(
