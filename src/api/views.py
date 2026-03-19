@@ -44,7 +44,7 @@ from .helpers import (
     fetch_results_all_types,
     fetch_results_for_type,
     get_http_message,
-    get_item_lists_payload,
+    get_item_lists,
     get_media_status,
     get_sorts,
     paginate_data,
@@ -81,9 +81,11 @@ from .serializers import (
 
 # TODO: Move operations on db to `models` file of the relative django app
 
-# TODO!!: since it's possible to add to lists untracked items, the id field can be null, so it's impossible to get these elements from the list, while it should be possible. The untracked added element is in the Items table, but not in the media tables.
+# TODO!!: since it's possible to add to lists untracked items, the id field can be null, so it's impossible to get these elements from the list, while it should be possible. The untracked added element is in the Items table, but not in the media tables. Add the list of lists an item is in to the model of the medias, so they can be retrieved and computed easily.
 
 # TODO: look into django.core.paginator Paginator
+
+# TODO!!!!!: Episode computation is not working. The `/seasons` and `/episodes` endpoints need to be uniformed to the rest of the models, right now SeasonSerializer and EpisodeSerializer return differently formated data.
 
 
 # /api/v1/calendar/
@@ -235,7 +237,8 @@ class HealthView(CheckMixin, drf_views.APIView):
     authentication_classes = []
     permission_classes = []
 
-    def get(self, request, *args, **kwargs):  # noqa: ARG002
+    def get(self, request):
+        # TODO: speed up data collection, right now request takes ~2s
         """Check API health status."""
         errors = self.errors
         plugins = self.plugins
@@ -1079,6 +1082,7 @@ class MediaDetailView(drf_views.APIView):
         )
 
     def get(self, request, media_type, source, media_id):
+        # TODO: the list of seasons should be of the Media type of the last consumption
         """Retrieve details of a specific media for the authenticated user."""
         user = request.user
 
@@ -1125,7 +1129,7 @@ class MediaDetailView(drf_views.APIView):
         ):
             media_metadata["related"].pop("recommendations")
 
-        lists = get_item_lists_payload(user, media_id, source, media_type)
+        lists = get_item_lists(user, media_id, source, media_type)
 
         data = {
             "media_metadata": media_metadata,
@@ -1224,7 +1228,7 @@ class MediaDetailView(drf_views.APIView):
         ):
             media_metadata["related"].pop("recommendations")
 
-        lists = get_item_lists_payload(user, media_id, source, media_type)
+        lists = get_item_lists(user, media_id, source, media_type)
 
         data = {
             "media_metadata": media_metadata,
@@ -1539,7 +1543,7 @@ class MediaListsView(drf_views.APIView):
                 status=400,
             )
 
-        lists = get_item_lists_payload(user, media_id, source, media_type)
+        lists = get_item_lists(user, media_id, source, media_type)
         paginated_data = paginate_data(request, lists, limit, offset)
 
         return Response(paginated_data, status=200)
@@ -1658,7 +1662,7 @@ class MediaListDetailView(drf_views.APIView):
 
         user_list.items.add(item)
 
-        lists = get_item_lists_payload(user, media_id, source, media_type)
+        lists = get_item_lists(user, media_id, source, media_type)
 
         return Response(lists, status=200)
 
@@ -1713,6 +1717,7 @@ class MediaSeasonsView(drf_views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id):
+        # TODO: the list of seasons should be of the Media type of the last consumption
         """Retrieve the history timeline for a specific media."""
         user = request.user
         limit, offset, err = parse_limit_offset(request)
@@ -1766,7 +1771,7 @@ class MediaSeasonsView(drf_views.APIView):
             if season_number is None:
                 continue
 
-            lists_by_season[season_number] = get_item_lists_payload(
+            lists_by_season[season_number] = get_item_lists(
                 user,
                 media_id,
                 source,
@@ -1922,6 +1927,7 @@ class MediaSeasonDetailView(drf_views.APIView):
         )
 
     def get(self, request, media_type, source, media_id, season_number):
+        # TODO: the list of episodes should be of the Media type of the last consumption
         """Retrieve details of a specific season for the authenticated user."""
         user = request.user
 
@@ -1982,7 +1988,7 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=500,
             )
 
-        lists = get_item_lists_payload(
+        lists = get_item_lists(
             user,
             media_id,
             source,
@@ -2090,7 +2096,7 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=500,
             )
 
-        lists = get_item_lists_payload(
+        lists = get_item_lists(
             user,
             media_id,
             source,
@@ -2179,6 +2185,7 @@ class MediaSeasonEpisodesView(drf_views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id, season_number):
+        # TODO: the list of episodes should be of the Media type of the last consumption
         """Retrieve the episodes for a specific season of a tv serie."""
         user = request.user
         limit, offset, err = parse_limit_offset(request)
@@ -2239,7 +2246,7 @@ class MediaSeasonEpisodesView(drf_views.APIView):
             episode_number = episode.get("episode_number")
             if episode_number is None:
                 continue
-            lists_by_episode[episode_number] = get_item_lists_payload(
+            lists_by_episode[episode_number] = get_item_lists(
                 user,
                 media_id,
                 source,
@@ -2572,7 +2579,7 @@ class MediaSeasonListsView(drf_views.APIView):
                 status=400,
             )
 
-        lists = get_item_lists_payload(
+        lists = get_item_lists(
             user,
             media_id,
             source,
@@ -2723,7 +2730,7 @@ class MediaSeasonListDetailView(drf_views.APIView):
 
         user_list.items.add(item)
 
-        lists = get_item_lists_payload(
+        lists = get_item_lists(
             user,
             media_id,
             source,
@@ -3010,7 +3017,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
                 season_number=season_number,
                 episode_number=episode_number,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return Response(
                 {
                     "detail": get_http_message(500)
@@ -3022,7 +3029,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
         media_metadata.pop("episodes")
 
-        lists = get_item_lists_payload(
+        lists = get_item_lists(
             user,
             media_id,
             source,
@@ -3169,7 +3176,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
                     status=404,
                 )
 
-        lists = get_item_lists_payload(
+        lists = get_item_lists(
             user,
             media_id,
             source,
@@ -3199,7 +3206,7 @@ class MediaEpisodeChangesHistoryView(drf_views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id, season_number, episode_number):
-        """Retrieve changes history timeline entries for a specific episode of a tv serie."""
+        """Retrieve changes history timeline entries for a specific episode."""
         limit, offset, err = parse_limit_offset(request)
         if err:
             return err
@@ -3577,7 +3584,7 @@ class MediaEpisodeListsView(drf_views.APIView):
                 status=400,
             )
 
-        lists = get_item_lists_payload(
+        lists = get_item_lists(
             user,
             media_id,
             source,
@@ -3749,7 +3756,7 @@ class MediaEpisodeListDetailView(drf_views.APIView):
 
         user_list.items.add(item)
 
-        lists = get_item_lists_payload(
+        lists = get_item_lists(
             user,
             media_id,
             source,

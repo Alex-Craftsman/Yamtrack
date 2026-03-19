@@ -191,7 +191,7 @@ def build_lists_by_item_id(user, objects):
         if item.id in lists_by_item_id:
             continue
 
-        lists_by_item_id[item.id] = get_item_lists_payload(
+        lists_by_item_id[item.id] = get_item_lists(
             user,
             item.media_id,
             item.source,
@@ -289,7 +289,7 @@ def fetch_results_all_types(user, status, sort, search, exclude):
 
 
 # TODO: move to lists/models.py
-def get_item_lists_payload(
+def get_item_lists(
     user,
     media_id,
     source,
