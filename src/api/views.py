@@ -5,7 +5,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import IntegrityError
-from django.db.models import Q
 from django.utils.timezone import datetime, localdate, make_aware
 from health_check.mixins import CheckMixin
 from rest_framework import permissions
@@ -64,7 +63,6 @@ from .serializers import (
     HistorySerializer,
     InfoSerializer,
     MediaSerializer,
-    SeasonSerializer,
     TimelineItemSerializer,
     serialize_data,
 )
@@ -85,7 +83,7 @@ from .serializers import (
 
 # TODO: look into django.core.paginator Paginator
 
-# TODO!!!!!: Episode computation is not working. The `/seasons` and `/episodes` endpoints need to be uniformed to the rest of the models, right now SeasonSerializer and EpisodeSerializer return differently formated data.
+# TODO: Review children endpoints performance and avoid repeated list lookups per item.
 
 
 # /api/v1/calendar/
@@ -1082,7 +1080,6 @@ class MediaDetailView(drf_views.APIView):
         )
 
     def get(self, request, media_type, source, media_id):
-        # TODO: the list of seasons should be of the Media type of the last consumption
         """Retrieve details of a specific media for the authenticated user."""
         user = request.user
 
@@ -1129,11 +1126,39 @@ class MediaDetailView(drf_views.APIView):
         ):
             media_metadata["related"].pop("recommendations")
 
+        seasons_by_number = None
+        if media_type == MediaTypes.TV.value:
+            serie_seasons = list(
+                BasicMedia.objects.get_serie_seasons(
+                    user,
+                    media_id,
+                    source,
+                ),
+            )
+            season_lists_by_number = (
+                BasicMedia.objects.get_serie_season_lists_by_number(
+                    user,
+                    serie_seasons,
+                )
+            )
+            for tracked in serie_seasons:
+                season_number = getattr(tracked.item, "season_number", None)
+                if season_number is not None:
+                    tracked.lists = season_lists_by_number.get(season_number, [])
+
+            seasons_by_number = {
+                tracked.item.season_number: tracked
+                for tracked in serie_seasons
+                if getattr(tracked, "item", None) is not None
+                and tracked.item.season_number is not None
+            }
+
         lists = get_item_lists(user, media_id, source, media_type)
 
         data = {
             "media_metadata": media_metadata,
             "user_medias": user_medias,
+            "seasons": seasons_by_number,
             "lists": lists,
         }
 
@@ -1717,7 +1742,6 @@ class MediaSeasonsView(drf_views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id):
-        # TODO: the list of seasons should be of the Media type of the last consumption
         """Retrieve the history timeline for a specific media."""
         user = request.user
         limit, offset, err = parse_limit_offset(request)
@@ -1765,13 +1789,13 @@ class MediaSeasonsView(drf_views.APIView):
             seasons = media_metadata["related"]["seasons"]
 
         paginated_data = paginate_data(request, seasons, limit, offset)
-        lists_by_season = {}
+        lists_by_number = {}
         for season in paginated_data["results"]:
             season_number = season.get("season_number")
             if season_number is None:
                 continue
 
-            lists_by_season[season_number] = get_item_lists(
+            lists_by_number[season_number] = get_item_lists(
                 user,
                 media_id,
                 source,
@@ -1779,11 +1803,91 @@ class MediaSeasonsView(drf_views.APIView):
                 season_number=season_number,
             )
 
+        season_numbers = [
+            season.get("season_number")
+            for season in paginated_data["results"]
+            if season.get("season_number") is not None
+        ]
+
+        items_by_number = {
+            item.season_number: item
+            for item in Item.objects.filter(
+                media_id=media_id,
+                source=source,
+                media_type=MediaTypes.SEASON.value,
+                season_number__in=season_numbers,
+            )
+        }
+
+        tracked_by_number = {}
+        if season_numbers:
+            tracked_seasons = BasicMedia.objects.get_serie_seasons(
+                user,
+                media_id,
+                source,
+                season_numbers=season_numbers,
+            )
+            for tracked in tracked_seasons:
+                item = getattr(tracked, "item", None)
+                tracked_number = getattr(item, "season_number", None)
+                if (
+                    tracked_number is not None
+                    and tracked_number in season_numbers
+                    and tracked_number not in tracked_by_number
+                ):
+                    tracked_by_number[tracked_number] = tracked
+
+        season_media_entries = []
+        for season in paginated_data["results"]:
+            season_number = season.get("season_number")
+            tracked = tracked_by_number.get(season_number)
+            lists = lists_by_number.get(season_number, [])
+
+            if tracked is not None:
+                tracked.lists = lists
+                if getattr(tracked, "item", None) is None:
+                    tracked.item = items_by_number.get(season_number)
+                season_media_entries.append(tracked)
+                continue
+
+            item = items_by_number.get(season_number)
+            if item is None:
+                item = Item(
+                    media_id=media_id,
+                    source=source,
+                    media_type=MediaTypes.SEASON.value,
+                    title=season.get("season_title") or season.get("title") or "",
+                    image=season.get("image") or settings.IMG_NONE,
+                    season_number=season_number,
+                )
+
+            season_media_entries.append(
+                type(
+                    "TempMedia",
+                    (),
+                    {
+                        "id": None,
+                        "item": item,
+                        "lists": lists,
+                        "created_at": None,
+                        "score": None,
+                        "status": None,
+                        "progress": None,
+                        "progressed_at": None,
+                        "start_date": None,
+                        "end_date": None,
+                        "notes": None,
+                    },
+                )(),
+            )
+
         paginated_data["results"] = serialize_data(
-            paginated_data["results"],
+            season_media_entries,
             many=True,
-            context={"lists_by_season": lists_by_season},
-            serializer_class=SeasonSerializer,
+            context={
+                "request": request,
+            },
+            serializer_class=MediaSerializer,
         )
         return Response(paginated_data, status=200)
 
@@ -1927,7 +2031,6 @@ class MediaSeasonDetailView(drf_views.APIView):
         )
 
     def get(self, request, media_type, source, media_id, season_number):
-        # TODO: the list of episodes should be of the Media type of the last consumption
         """Retrieve details of a specific season for the authenticated user."""
         user = request.user
 
@@ -1988,6 +2091,30 @@ class MediaSeasonDetailView(drf_views.APIView):
                 status=500,
             )
 
+        season_episodes = list(
+            BasicMedia.objects.get_season_episodes(
+                user,
+                media_id,
+                source,
+                season_number=season_number,
+            ),
+        )
+        episode_lists_by_number = BasicMedia.objects.get_season_episode_lists_by_number(
+            user,
+            season_episodes,
+        )
+        for tracked in season_episodes:
+            episode_number = getattr(tracked.item, "episode_number", None)
+            if episode_number is not None:
+                tracked.lists = episode_lists_by_number.get(episode_number, [])
+
+        episodes_by_number = {
+            tracked.item.episode_number: tracked
+            for tracked in season_episodes
+            if getattr(tracked, "item", None) is not None
+            and tracked.item.episode_number is not None
+        }
+
         lists = get_item_lists(
             user,
             media_id,
@@ -1999,12 +2126,12 @@ class MediaSeasonDetailView(drf_views.APIView):
         data = {
             "media_metadata": media_metadata,
             "user_medias": user_medias,
+            "episodes": episodes_by_number,
             "lists": lists,
         }
 
         serialized = serialize_data(
             data,
-            context={"request": request},
             serializer_class=CompleteMediaSerializer,
         )
         return Response(serialized, status=200)
@@ -2185,7 +2312,6 @@ class MediaSeasonEpisodesView(drf_views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, media_type, source, media_id, season_number):
-        # TODO: the list of episodes should be of the Media type of the last consumption
         """Retrieve the episodes for a specific season of a tv serie."""
         user = request.user
         limit, offset, err = parse_limit_offset(request)
@@ -2241,12 +2367,12 @@ class MediaSeasonEpisodesView(drf_views.APIView):
 
         # TODO: see if this can be optimized with a single query for all episodes instead of one per episode
         # TODO: see if lists infos can be saved in the `episodes` object to avoid using `context` to pass additional parameters
-        lists_by_episode = {}
+        lists_by_number = {}
         for episode in paginated["results"]:
             episode_number = episode.get("episode_number")
             if episode_number is None:
                 continue
-            lists_by_episode[episode_number] = get_item_lists(
+            lists_by_number[episode_number] = get_item_lists(
                 user,
                 media_id,
                 source,
@@ -2255,12 +2381,38 @@ class MediaSeasonEpisodesView(drf_views.APIView):
                 episode_number=episode_number,
             )
 
+        episode_numbers = [
+            episode.get("episode_number")
+            for episode in paginated["results"]
+            if episode.get("episode_number") is not None
+        ]
+
+        tracked_by_number = {}
+        if episode_numbers:
+            tracked_episodes = BasicMedia.objects.get_season_episodes(
+                user,
+                media_id,
+                source,
+                season_number=season_number,
+                episode_numbers=episode_numbers,
+            )
+            for tracked in tracked_episodes:
+                item = getattr(tracked, "item", None)
+                tracked_number = getattr(item, "episode_number", None)
+                if (
+                    tracked_number is not None
+                    and tracked_number in episode_numbers
+                    and tracked_number not in tracked_by_number
+                ):
+                    tracked_by_number[tracked_number] = tracked
+
         paginated["results"] = serialize_data(
             paginated["results"],
             many=True,
             context={
                 "source": source,
-                "lists_by_episode": lists_by_episode,
+                "tracked_episodes": tracked_by_number,
+                "lists_by_number": lists_by_number,
             },
             serializer_class=EpisodeSerializer,
         )

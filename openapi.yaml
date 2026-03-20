@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.20
+  version: 0.0.21
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -1607,7 +1607,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedSeasons"
+                $ref: "#/components/schemas/PaginatedMedia"
         "400":
           description: Bad Request
           content:
@@ -1970,7 +1970,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedEpisodes"
+                $ref: "#/components/schemas/PaginatedMedia"
         "400":
           description: Bad Request
           content:
@@ -3601,7 +3601,6 @@ components:
         items:
           $ref: "#/components/schemas/PaginatedMedia"
     CompleteMedia:
-      # TODO: add the lists where the media is, with the list_id position
       type: object
       properties:
         id:
@@ -4188,11 +4187,14 @@ components:
         id:
           type: integer
           description: The id of the item in the database (not to be confused with the item_id, which is media provider specific)
+          nullable: true
         consumption_id:
           type: integer
           description: The id of the media consumption (id numbers are global for all consumptions of all medias of the same type, not sequential per media)
+          nullable: true
         item:
           $ref: "#/components/schemas/Item"
+          nullable: true
         item_id:
           $ref: "#/components/schemas/ItemId"
         parent_id:
@@ -4205,6 +4207,7 @@ components:
         created_at:
           type: string
           format: date-time
+          nullable: true
         score:
           type: number
           format: float
@@ -4213,6 +4216,11 @@ components:
           $ref: "#/components/schemas/MediaStatus"
         progress:
           type: integer
+          nullable: true
+        progressed_at:
+          type: string
+          format: date-time
+          nullable: true
         start_date:
           type: string
           format: date-time
@@ -4315,15 +4323,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ChangesHistoryRecord"
-    PaginatedEpisodes:
-      type: object
-      properties:
-        pagination:
-          $ref: "#/components/schemas/Pagination"
-        results:
-          type: array
-          items:
-            $ref: "#/components/schemas/Episode"
     PaginatedLists:
       type: object
       properties:
@@ -4351,15 +4350,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SearchItem"
-    PaginatedSeasons:
-      type: object
-      properties:
-        pagination:
-          $ref: "#/components/schemas/Pagination"
-        results:
-          type: array
-          items:
-            $ref: "#/components/schemas/Season"
     PaginatedConsumptionHistory:
       type: object
       properties:
@@ -4480,7 +4470,7 @@ components:
         episodes:
           type: array
           items:
-            $ref: "#/components/schemas/Episode"
+            $ref: "#/components/schemas/Media"
     SortOptions:
       type: string
       enum:
@@ -4694,7 +4684,7 @@ components:
           type: array
           description: Related seasons
           items:
-            $ref: "#/components/schemas/Season"
+            $ref: "#/components/schemas/Media"
     UpdateAnime:
       description: |
         Payload for updating anime. All fields can be modified.

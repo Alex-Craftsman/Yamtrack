@@ -1,7 +1,7 @@
 import logging
 from urllib.parse import urlencode
 
-from django.db.models import OuterRef, Q, Subquery
+from django.db.models import OuterRef, Subquery
 from django.utils.dateparse import parse_date
 from rest_framework.response import Response
 
@@ -310,22 +310,7 @@ def get_item_lists(
     if item is None or user is None:
         return []
 
-    custom_list_items = (
-        CustomListItem.objects.filter(item=item)
-        .filter(
-            Q(custom_list__owner=user) | Q(custom_list__collaborators=user),
-        )
-        .order_by("custom_list_id", "list_item_id")
-        .distinct()
-    )
-
-    return [
-        {
-            "list_id": custom_list_item.custom_list_id,
-            "list_item_id": custom_list_item.list_item_id,
-        }
-        for custom_list_item in custom_list_items
-    ]
+    return CustomListItem.objects.get_user_item_lists(user, item)
 
 
 def get_sorts(media_type, *, sort_type="all"):
@@ -474,7 +459,7 @@ def parse_status_param(status):
     if not status:
         return MediaStatusChoices.ALL
     try:
-        return get_media_status(int(status))
+        return get_media_status(int(status), reverse=True)
     except (TypeError, ValueError):
         return None
 

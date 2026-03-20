@@ -127,6 +127,7 @@ class CompleteEpisodeSerializer(serializers.Serializer):
         if season_source_url:
             source_url = f"{season_source_url}/episode/{episode.get('episode_number')}"
 
+        # TODO: move still_path slug to global configs
         image = (
             "https://image.tmdb.org/t/p/original" + episode.get("still_path")
             if episode.get("still_path")
@@ -175,7 +176,7 @@ class CompleteEpisodeSerializer(serializers.Serializer):
 class CompleteMediaSerializer(serializers.Serializer):
     """Serializer that builds a CompleteMedia response."""
 
-    def _process_seasons(self, media_metadata):
+    def _process_seasons(self, media_metadata, seasons_by_number=None):
         """Process seasons in related data."""
         if "related" not in media_metadata or media_metadata["related"] is None:
             media_metadata["related"] = {}
@@ -185,37 +186,72 @@ class CompleteMediaSerializer(serializers.Serializer):
         ):
             media_metadata["related"]["seasons"] = []
 
+        processed_seasons = []
         for season in media_metadata["related"]["seasons"]:
-            temp_season = type("TempSeason", (), season)()
-            season["item_id"] = ItemIdField().to_representation(temp_season)
-            season["parent_id"] = ParentIdField().to_representation(temp_season)
+            season_number = season.get("season_number")
+            tracked_season = (
+                seasons_by_number.get(season_number) if seasons_by_number else None
+            )
 
-    def _process_episodes(self, media_metadata):
+            item = getattr(tracked_season, "item", None)
+            if item is None:
+                item = Item(
+                    media_id=str(
+                        season.get("media_id") or media_metadata.get("media_id") or "",
+                    ),
+                    source=season.get("source") or media_metadata.get("source"),
+                    media_type=MediaTypes.SEASON.value,
+                    title=season.get("season_title") or season.get("title") or "",
+                    image=season.get("image") or settings.IMG_NONE,
+                    season_number=season_number,
+                )
+
+            if tracked_season is None:
+                tracked_season = type(
+                    "TempMedia",
+                    (),
+                    {
+                        "id": None,
+                        "item": item,
+                        "created_at": None,
+                        "score": None,
+                        "status": None,
+                        "progress": None,
+                        "progressed_at": None,
+                        "start_date": None,
+                        "end_date": None,
+                        "notes": None,
+                    },
+                )()
+
+            processed_seasons.append(
+                MediaSerializer().to_representation(tracked_season),
+            )
+
+        media_metadata["related"]["seasons"] = processed_seasons
+
+    def _process_episodes(self, media_metadata, episodes_by_number=None):
         """Process episodes in media data."""
         if "related" not in media_metadata or media_metadata["related"] is None:
             media_metadata["related"] = {}
-
         if (
             "episodes" not in media_metadata["related"]
             or media_metadata["related"]["episodes"] is None
         ):
             media_metadata["related"]["episodes"] = []
 
-        if "related" not in media_metadata or media_metadata["related"] is None:
-            media_metadata["related"] = {}
+        episodes = media_metadata.pop("episodes", [])
+        serializer = EpisodeSerializer(
+            context={
+                "source": media_metadata.get("source"),
+                "tracked_episodes": episodes_by_number or {},
+            },
+        )
+        processed_episodes = [
+            serializer.to_representation(episode) for episode in episodes
+        ]
 
-        episodes = media_metadata.pop("episodes")
-        for episode in episodes:
-            temp_episode = type("TempEpisode", (), {})()
-            temp_episode.media_type = "episode"
-            temp_episode.source = media_metadata.get("source")
-            temp_episode.media_id = episode.get("show_id")
-            temp_episode.season_number = episode.get("season_number")
-            temp_episode.episode_number = episode.get("episode_number")
-            episode["item_id"] = ItemIdField().to_representation(temp_episode)
-            episode["parent_id"] = ParentIdField().to_representation(temp_episode)
-
-        media_metadata["related"]["episodes"] = episodes
+        media_metadata["related"]["episodes"] = processed_episodes
 
     def to_representation(self, instance):
         """Transform media_metadata and user data into CompleteMedia response."""
@@ -225,9 +261,9 @@ class CompleteMediaSerializer(serializers.Serializer):
         media_type = media_metadata.get("media_type")
 
         if media_type == MediaTypes.TV.value:
-            self._process_seasons(media_metadata)
+            self._process_seasons(media_metadata, instance.get("seasons"))
         elif media_type == MediaTypes.SEASON.value:
-            self._process_episodes(media_metadata)
+            self._process_episodes(media_metadata, instance.get("episodes"))
 
         temp_media = type("TempMedia", (), media_metadata)()
 
@@ -283,29 +319,95 @@ class EpisodeSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """Serialize an Episode with item details."""
-        source = self.context.get("source")
-        lists_by_episode = self.context.get("lists_by_episode", {})
+        context = self.context or {}
 
-        temp_episode = type("TempEpisode", (), {})()
-        temp_episode.media_type = "episode"
-        temp_episode.source = source
-        temp_episode.media_id = instance.get("show_id")
-        temp_episode.season_number = instance.get("season_number")
-        temp_episode.episode_number = instance.get("episode_number")
+        if isinstance(instance, Episode):
+            item = getattr(instance, "item", None)
+            lists_by_item_id = context.get("lists_by_item_id", {})
+            return {
+                "id": item.id if item is not None else None,
+                "consumption_id": instance.id,
+                "item": ItemSerializer().to_representation(item)
+                if item is not None
+                else None,
+                "item_id": ItemIdField().to_representation(item)
+                if item is not None
+                else None,
+                "parent_id": ParentIdField().to_representation(item)
+                if item is not None
+                else None,
+                "tracked": True,
+                "created_at": instance.created_at,
+                "score": None,
+                "status": 3,
+                "progress": 1,
+                "progressed_at": instance.end_date,
+                "start_date": instance.created_at,
+                "end_date": instance.end_date,
+                "notes": None,
+                "lists": lists_by_item_id.get(item.id, []),
+            }
 
-        image = (
-            "https://image.tmdb.org/t/p/original" + instance.get("still_path")
-            if instance.get("still_path")
-            else None
-        )
+        media_id = instance.get("show_id")
+        season_number = instance.get("season_number")
+        episode_number = instance.get("episode_number")
 
-        instance["still_path"] = image
+        tracked_episodes = context.get("tracked_episodes", {})
+        episode = tracked_episodes.get(episode_number)
+        tracked = episode is not None
+        if hasattr(episode, "item"):
+            item = getattr(episode, "item", None)
+        else:
+            image = (
+                "https://image.tmdb.org/t/p/original" + instance.get("still_path")
+                if instance.get("still_path")
+                else None
+            )
+            item = Item(
+                media_id=media_id,
+                source=context.get("source"),
+                media_type=MediaTypes.EPISODE.value,
+                title=instance.get("name") or "",
+                image=image,
+                season_number=season_number,
+                episode_number=episode_number,
+            )
 
-        instance["item_id"] = ItemIdField().to_representation(temp_episode)
-        instance["parent_id"] = ParentIdField().to_representation(temp_episode)
-        instance["lists"] = lists_by_episode.get(instance.get("episode_number"), [])
+        if hasattr(episode, "lists"):
+            lists = episode.lists
+        else:
+            lists = context.get("lists_by_number", {}).get(episode_number, [])
+            if not lists and item is not None:
+                lists_by_item_id = context.get("lists_by_item_id", {})
+                lists = lists_by_item_id.get(item.id, [])
 
-        return instance
+        return {
+            "id": item.id if item is not None else None,
+            "consumption_id": episode.id if episode is not None else None,
+            "item": ItemSerializer().to_representation(item)
+            if item is not None
+            else None,
+            "item_id": ItemIdField().to_representation(item)
+            if item is not None
+            else None,
+            "parent_id": ParentIdField().to_representation(item)
+            if item is not None
+            else None,
+            "tracked": tracked,
+            "created_at": episode.created_at
+            if hasattr(episode, "created_at")
+            else None,
+            "score": None,
+            "status": 3 if tracked else None,
+            "progress": 1 if tracked else None,
+            "progressed_at": episode.end_date if hasattr(episode, "end_date") else None,
+            "start_date": episode.created_at
+            if hasattr(episode, "created_at")
+            else None,
+            "end_date": episode.end_date if hasattr(episode, "end_date") else None,
+            "notes": None,
+            "lists": lists,
+        }
 
 
 class EventSerializer(serializers.ModelSerializer):
@@ -502,10 +604,13 @@ class MediaSerializer(serializers.ModelSerializer):
         """Serialize media."""
         item = getattr(instance, "item", None)
 
-        lists = []
-        if self.context and item is not None:
-            lists_by_item_id = self.context.get("lists_by_item_id", {})
-            lists = lists_by_item_id.get(item.id, [])
+        if hasattr(instance, "lists"):
+            lists = instance.lists
+        else:
+            lists = []
+            if self.context and item is not None:
+                lists_by_item_id = self.context.get("lists_by_item_id", {})
+                lists = lists_by_item_id.get(item.id, [])
 
         return {
             "id": item.id if item is not None else None,
@@ -519,7 +624,7 @@ class MediaSerializer(serializers.ModelSerializer):
             "parent_id": ParentIdField().to_representation(item)
             if item is not None
             else None,
-            "tracked": True,
+            "tracked": getattr(instance, "id", None) is not None,
             "created_at": instance.created_at,
             "score": float(instance.score)
             if hasattr(instance, "score") and instance.score is not None
@@ -552,7 +657,8 @@ class MixedMediaSerializer(serializers.Serializer):
 
         if serializer_class is None:
             msg = (
-                get_http_message(500) + f" No serializer found for type {instance_type}. "
+                get_http_message(500)
+                + f" No serializer found for type {instance_type}. "
                 f"Supported types: {list(serializer_map.keys())}."
             )
             raise ValueError(msg)
@@ -575,7 +681,7 @@ class UntrackedMediaSerializer(serializers.Serializer):
         return {
             "id": instance.id,
             "consumption_id": None,
-            "item": ItemSerializer().to_representation(instance.item),
+            "item": ItemSerializer().to_representation(instance),
             "item_id": ItemIdField().to_representation(instance),
             "parent_id": ParentIdField().to_representation(instance),
             "tracked": False,
@@ -583,32 +689,12 @@ class UntrackedMediaSerializer(serializers.Serializer):
             "score": None,
             "status": None,
             "progress": None,
+            "progressed_at": None,
             "start_date": None,
             "end_date": None,
             "notes": None,
             "lists": lists,
         }
-
-
-class SeasonSerializer(serializers.ModelSerializer):
-    """Serializer used for Season items."""
-
-    def to_representation(self, instance):
-        """Serialize a Season with item details."""
-        lists_by_season = self.context.get("lists_by_season", {})
-
-        class TempItem:
-            def __init__(self, season_dict):
-                for key, value in season_dict.items():
-                    setattr(self, key, value)
-
-        temp_item = TempItem(instance)
-
-        instance["item_id"] = ItemIdField().to_representation(temp_item)
-        instance["parent_id"] = ParentIdField().to_representation(temp_item)
-        instance["lists"] = lists_by_season.get(instance.get("season_number"), [])
-
-        return instance
 
 
 class TimelineItemSerializer(serializers.ModelSerializer):
@@ -681,7 +767,8 @@ def serialize_data(
 
             if detected_serializer_class is None:
                 msg = (
-                    get_http_message(500) + f" No serializer found for data type {first_type}. "
+                    get_http_message(500)
+                    + f" No serializer found for data type {first_type}. "
                     f"Supported types: {list(serializer_map.keys())}. "
                     f"Pass serializer_class explicitly if needed."
                 )

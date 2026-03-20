@@ -108,6 +108,46 @@ class CustomList(models.Model):
 class CustomListItemManager(models.Manager):
     """Manager for custom list items."""
 
+    def get_user_item_lists(self, user, item):
+        """Return list membership for a single item for a user."""
+        if item is None:
+            return []
+
+        return self.get_user_item_lists_map(user, [item.id]).get(item.id, [])
+
+    def get_user_item_lists_map(self, user, item_ids):
+        """Return a dictionary mapping item ids to their list memberships for a user."""
+        if user is None:
+            return {}
+
+        item_ids = [item_id for item_id in item_ids if item_id is not None]
+        if not item_ids:
+            return {}
+
+        list_items = (
+            self.filter(item_id__in=item_ids)
+            .filter(
+                Q(custom_list__owner=user) | Q(custom_list__collaborators=user),
+            )
+            .order_by("item_id", "custom_list_id", "list_item_id")
+            .distinct()
+        )
+
+        lists_by_item_id = {}
+        for list_item in list_items:
+            item_id = list_item.item_id
+            if item_id not in lists_by_item_id:
+                lists_by_item_id[item_id] = []
+
+            lists_by_item_id[item_id].append(
+                {
+                    "list_id": list_item.custom_list_id,
+                    "list_item_id": list_item.list_item_id,
+                },
+            )
+
+        return lists_by_item_id
+
     def get_next_list_item_id(self, custom_list_id):
         """Return the next sequential id for an item within a custom list."""
         current_max = (
