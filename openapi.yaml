@@ -11,6 +11,7 @@ security:
   - bearerAuth: []
 tags:
   - name: calendar
+  - name: changes_history
   - name: health
   - name: history
   - name: info
@@ -115,7 +116,7 @@ paths:
   /api/v1/changes_history/{media_type}/{history_id}/:
     delete:
       tags:
-        - history
+        - changes_history
       summary: Delete a specific changes history record by media type and history id
       parameters:
         - in: path
@@ -161,7 +162,7 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
     get:
       tags:
-        - history
+        - changes_history
       summary: Retrieve a specific changes history record by media type and history id
       parameters:
         - in: path
@@ -1030,7 +1031,7 @@ paths:
     get:
       tags:
         - media
-        - history
+        - changes_history
       summary: Get changes history records for a media item
       parameters:
         - in: path
@@ -1857,7 +1858,7 @@ paths:
     get:
       tags:
         - media
-        - history
+        - changes_history
       summary: Get changes history records for a season
       parameters:
         - in: path
@@ -2692,7 +2693,7 @@ paths:
     get:
       tags:
         - media
-        - history
+        - changes_history
       summary: Get changes history records for an episode
       parameters:
         - in: path
@@ -4308,7 +4309,7 @@ components:
     PaginatedCalendar:
       type: object
       properties:
-        Pagination:
+        pagination:
           $ref: "#/components/schemas/Pagination"
         results:
           type: array
