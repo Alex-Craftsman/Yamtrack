@@ -31,8 +31,9 @@ def metadata(media_id, media_type):
     if season_items.count() > 0:
         response["details"]["seasons"] = season_items.count()
 
-    num_episodes = process_seasons(season_items, response)
-    set_max_progress(response, num_episodes, item.media_type)
+    if media_type == MediaTypes.TV.value:
+        num_episodes = process_seasons(season_items, response)
+        set_max_progress(response, num_episodes, item.media_type)
 
     return response
 

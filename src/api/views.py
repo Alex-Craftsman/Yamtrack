@@ -875,9 +875,8 @@ class MediaTypeListView(drf_views.APIView):
         paginated_data["results"] = serialized_data
         return Response(paginated_data, status=200)
 
-    def post(self, request, media_type):  # noqa: C901, D102, PLR0911, PLR0912
-        return Response({"detail": get_http_message(501)}, status=501)
-
+    def post(self, request, media_type):
+        """Track a new media item of a specific media type."""
         if not check_valid_type(media_type, complete=True):
             return Response(
                 {"detail": get_http_message(400) + " Unsupported media type."},
@@ -893,14 +892,15 @@ class MediaTypeListView(drf_views.APIView):
         body = request.data
         body["media_type"] = media_type
         body["status"] = (
-            get_media_status(body["status"])
+            get_media_status(body["status"], reverse=True)
             if "status" in body
+            # default status when tracking a new media will be "planning"
             else MediaStatusChoices.PLANNING
         )
 
         source = body.get("source", Sources.MANUAL.value)
 
-        if str(source) == Sources.MANUAL.value:
+        if source == Sources.MANUAL.value:
             form = ManualItemForm(body, user=request.user)
             if not form.is_valid():
                 return Response(
