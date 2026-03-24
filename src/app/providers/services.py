@@ -179,8 +179,13 @@ def get_media_metadata(
     return metadata_retrievers[media_type]()
 
 
-def search(media_type, query, page, source=None):
+def search(media_type, query, page, source=None, limit=None, offset=None, user=None):
     """Search for media based on the query and return the results."""
+    if source == Sources.MANUAL.value:
+        return manual.search(
+            media_type, query, page=page, limit=limit, offset=offset, user=user,
+        )
+
     if media_type == MediaTypes.MANGA.value:
         if source == Sources.MANGAUPDATES.value:
             response = mangaupdates.search(query, page)

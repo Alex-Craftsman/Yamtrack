@@ -3977,25 +3977,21 @@ class SearchProviderView(drf_views.APIView):
                 },
             )
 
-        if source == Sources.MANUAL.value:
-            # TODO: search for manual source should query only already tracked media
-            # Since manual source data is user-defined and not indexed,
-            # searching is not supported
-            return Response(
-                {
-                    "detail": get_http_message(400)
-                    + " Search for manual source is not supported.",
-                },
-                status=400,
-            )
-
         results_accum = []
         page = 1
         last_response = None
 
         try:
             while True:
-                last_response = services.search(media_type, search, page, source)
+                last_response = services.search(
+                    media_type,
+                    search,
+                    page,
+                    source,
+                    limit=limit,
+                    offset=offset,
+                    user=request.user,
+                )
                 if (
                     not isinstance(last_response, dict)
                     or "results" not in last_response

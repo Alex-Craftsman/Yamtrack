@@ -6,6 +6,17 @@ from django.shortcuts import redirect
 from django.utils.encoding import iri_to_uri
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from app import models
+
+MODEL_MAP = {
+    models.MediaTypes.TV.value: models.TV,
+    models.MediaTypes.MOVIE.value: models.Movie,
+    models.MediaTypes.ANIME.value: models.Anime,
+    models.MediaTypes.MANGA.value: models.Manga,
+    models.MediaTypes.GAME.value: models.Game,
+    models.MediaTypes.BOOK.value: models.Book,
+    models.MediaTypes.COMIC.value: models.Comic,
+}
 
 def minutes_to_hhmm(total_minutes):
     """Convert total minutes to HH:MM format."""
