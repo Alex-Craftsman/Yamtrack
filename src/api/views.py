@@ -3933,7 +3933,7 @@ class MediaEpisodeSyncView(drf_views.APIView):
         source,
         media_id,
         season_number,
-        _,
+        episode_number,  # noqa: ARG002
     ):
         """Redirect episode sync to season sync."""
         season_sync = MediaSeasonSyncView()
@@ -3975,6 +3975,7 @@ class SearchProviderView(drf_views.APIView):
                     "detail": get_http_message(400)
                     + f" Search for {media_type} is not supported.",
                 },
+                status=400,
             )
 
         results_accum = []

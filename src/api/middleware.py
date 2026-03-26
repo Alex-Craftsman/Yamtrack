@@ -33,7 +33,7 @@ class ApiJsonErrorMiddleware:
         """Safely extract the request path."""
         try:
             return request.path or ""
-        except Exception:
+        except Exception:  # noqa: BLE001
             return ""
 
     def _handle_template_response(self, response, path):
@@ -61,7 +61,7 @@ class ApiJsonErrorMiddleware:
         if hasattr(response, "get"):
             try:
                 return response.get("Content-Type", "")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return getattr(response, "content_type", "")
 
         return getattr(response, "content_type", "")
@@ -70,7 +70,7 @@ class ApiJsonErrorMiddleware:
         """Determine if response should be converted to JSON."""
         if content_type and "application/json" in content_type:
             return False
-        return status >= 400 and (not content_type or "html" in content_type.lower())
+        return status >= 400 and (not content_type or "html" in content_type.lower())  # noqa: PLR2004
 
     def _build_json_error_response(self, response, status):
         """Build JSON error response."""
@@ -88,7 +88,7 @@ class ApiJsonErrorMiddleware:
         """Extract debug detail from response content."""
         try:
             return response.content.decode(errors="ignore")
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     def process_exception(self, request, exception):

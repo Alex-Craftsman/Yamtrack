@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.21
+  version: 0.0.22
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -24,7 +24,7 @@ paths:
     get:
       tags:
         - calendar
-      summary: List upcoming calendar events
+      summary: List upcoming events of tracked media
       parameters:
         - in: query
           name: start_date
@@ -843,7 +843,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Item"
+                $ref: "#/components/schemas/CompleteMedia"
         "400":
           description: Bad Request
           content:
@@ -872,7 +872,7 @@ paths:
     delete:
       tags:
         - media
-      summary: Delete a tracked media item and all its consumptions
+      summary: Delete a media item and all its consumptions if it's tracked
       parameters:
         - in: path
           name: media_type
@@ -919,7 +919,7 @@ paths:
     get:
       tags:
         - media
-      summary: Retrieve a tracked media item
+      summary: Retrieve a media item
       parameters:
         - in: path
           name: media_type
@@ -970,7 +970,7 @@ paths:
     patch:
       tags:
         - media
-      summary: Edit LAST CONSUMPTION of a tracked media item
+      summary: Edit LAST CONSUMPTION of a media item if it's tracked
       parameters:
         - in: path
           name: media_type
@@ -4350,7 +4350,7 @@ components:
         results:
           type: array
           items:
-            $ref: "#/components/schemas/SearchItem"
+            $ref: "#/components/schemas/Media"
     PaginatedConsumptionHistory:
       type: object
       properties:
