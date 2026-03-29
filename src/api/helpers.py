@@ -9,6 +9,7 @@ from app.models import (
     TV,
     Anime,
     BasicMedia,
+    BoardGame,
     Book,
     Comic,
     Episode,
@@ -83,6 +84,14 @@ MEDIA_MODIFIABLE_FIELDS = {
         "end_date",
         "notes",
     },
+    MediaTypes.BOARDGAME.value: {
+        "score",
+        "status",
+        "progress",
+        "start_date",
+        "end_date",
+        "notes",
+    },
 }
 
 MEDIA_STATUS_MAP = {
@@ -103,6 +112,7 @@ MEDIA_TYPE_COMPLETE_MODEL_MAP = {
     MediaTypes.GAME.value: Game,
     MediaTypes.BOOK.value: Book,
     MediaTypes.COMIC.value: Comic,
+    MediaTypes.BOARDGAME.value: BoardGame,
 }
 
 MEDIA_TYPE_COMPLETE_VALID_LIST = list(MEDIA_TYPE_COMPLETE_MODEL_MAP.keys())
@@ -115,6 +125,7 @@ MEDIA_TYPE_MODEL_MAP = {
     MediaTypes.GAME.value: Game,
     MediaTypes.BOOK.value: Book,
     MediaTypes.COMIC.value: Comic,
+    MediaTypes.BOARDGAME.value: BoardGame,
 }
 
 MEDIA_TYPE_VALID_LIST = list(MEDIA_TYPE_MODEL_MAP.keys())
@@ -158,6 +169,7 @@ VALID_SOURCES = {
     MediaTypes.GAME.value: ["igdb", "manual"],
     MediaTypes.BOOK.value: ["openlibrary", "hardcover", "manual"],
     MediaTypes.COMIC.value: ["comicvine", "manual"],
+    MediaTypes.BOARDGAME.value: ["bgg", "manual"],
 }
 
 

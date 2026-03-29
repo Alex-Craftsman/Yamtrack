@@ -6,6 +6,7 @@ from app.models import (
     TV,
     Anime,
     BasicMedia,
+    BoardGame,
     Book,
     Comic,
     Episode,
@@ -276,6 +277,18 @@ class CompleteMediaSerializer(serializers.Serializer):
             details["next_episode_season"] = media_metadata.pop("next_episode_season")
         if "last_issue_id" in media_metadata:
             details["last_issue_id"] = media_metadata.pop("last_issue_id")
+        if "year" in details:
+            details["year"] = int(details["year"])
+        if "players" in details:
+            details["players"] = details["players"].strip(" players").split("-")
+        if "playtime" in details:
+            details["playtime"] = int(details["playtime"].strip(" min"))
+        if "min_age" in details:
+            details["min_age"] = int(details["min_age"].strip("+"))
+        if "designers" in details:
+            details["designers"] = details["designers"].split(", ")
+        if "publishers" in details:
+            details["publishers"] = details["publishers"].split(", ")
         related = media_metadata.get("related", {})
 
         consumptions_number = len(user_medias)
@@ -723,6 +736,7 @@ class TimelineItemSerializer(serializers.ModelSerializer):
 serializer_map = {
     Anime: MediaSerializer,
     BasicMedia: MediaSerializer,
+    BoardGame: MediaSerializer,
     Book: MediaSerializer,
     Comic: MediaSerializer,
     CustomList: ListSerializer,

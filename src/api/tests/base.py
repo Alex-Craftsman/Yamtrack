@@ -7,6 +7,7 @@ from django.urls import reverse
 from app.models import (
     TV,
     Anime,
+    BoardGame,
     Book,
     Comic,
     Game,
@@ -271,6 +272,30 @@ class ApiTestCase(TestCase):
                     image="https://example.com/comic-3.jpg",
                 ),
             ],
+            MediaTypes.BOARDGAME.value: [
+                Item.objects.create(
+                    media_id="7001",
+                    source=Sources.BGG.value,
+                    media_type=MediaTypes.BOARDGAME.value,
+                    title="Board Game 1",
+                    image="https://example.com/boardgame-1.jpg",
+                ),
+                Item.objects.create(
+                    media_id="7002",
+                    source=Sources.BGG.value,
+                    media_type=MediaTypes.BOARDGAME.value,
+                    title="Board Game 2",
+                    image="https://example.com/boardgame-2.jpg",
+                ),
+                Item.objects.create(
+                    media_id="7003",
+                    source=Sources.BGG.value,
+                    media_type=MediaTypes.BOARDGAME.value,
+                    title="Board Game 3",
+                    image="https://example.com/boardgame-3.jpg",
+                ),
+            ],
+
         }
 
         # Various tracked medias for user1.
@@ -302,6 +327,11 @@ class ApiTestCase(TestCase):
             Comic.objects.create(item=item, user=self.user1)
             for item in self.items_by_type[MediaTypes.COMIC.value]
         ]
+        self.boardgame_medias = [
+            BoardGame.objects.create(item=item, user=self.user1)
+            for item in self.items_by_type[MediaTypes.BOARDGAME.value]
+        ]
+
 
         self.season_medias = [
             Season.objects.create(
@@ -326,6 +356,7 @@ class ApiTestCase(TestCase):
             self.game_medias[0],
             self.book_medias[0],
             self.comic_medias[0],
+            self.boardgame_medias[0],
         ]
 
         for index, media in enumerate(media_for_history, start=1):
@@ -354,6 +385,9 @@ class ApiTestCase(TestCase):
             "game": self.game_medias[0].history.filter(history_user=self.user1).first(),
             "book": self.book_medias[0].history.filter(history_user=self.user1).first(),
             "comic": self.comic_medias[0]
+            .history.filter(history_user=self.user1)
+            .first(),
+            "boardgame": self.boardgame_medias[0]
             .history.filter(history_user=self.user1)
             .first(),
         }

@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.22
+  version: 0.0.23
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -3445,6 +3445,30 @@ components:
         detail:
           type: string
           description: The detail message of the response
+    BoardGameDetails:
+      type: object
+      properties:
+        year:
+          type: integer
+        players:
+          type: array
+          items:
+            type: integer
+        playtime:
+          type: integer
+        min_age:
+          type: integer
+        designers:
+          type: array
+          items:
+            type: string
+        publishers:
+          type: array
+          items:
+            type: string
+    BoardGameRelated:
+      type: object
+      nullable: true
     BookDetails:
       type: object
       properties:
@@ -3637,6 +3661,7 @@ components:
         details:
           oneOf:
             - $ref: "#/components/schemas/AnimeDetails"
+            - $ref: "#/components/schemas/BoardGameDetails"
             - $ref: "#/components/schemas/BookDetails"
             - $ref: "#/components/schemas/ComicDetails"
             - $ref: "#/components/schemas/EpisodeDetails"
@@ -3648,6 +3673,7 @@ components:
         related:
           oneOf:
             - $ref: "#/components/schemas/AnimeRelated"
+            - $ref: "#/components/schemas/BoardGameRelated"
             - $ref: "#/components/schemas/BookRelated"
             - $ref: "#/components/schemas/ComicRelated"
             - $ref: "#/components/schemas/EpisodeRelated"
@@ -4260,25 +4286,27 @@ components:
     MediaTypes:
       type: string
       enum:
-        - tv
-        - movie
         - anime
-        - manga
-        - game
+        - boardgame
         - book
         - comic
+        - game
+        - manga
+        - movie
+        - tv
     MediaTypesComplete:
       type: string
       enum:
-        - tv
-        - season
-        - episode
-        - movie
         - anime
-        - manga
-        - game
+        - boardgame
         - book
         - comic
+        - episode
+        - game
+        - manga
+        - movie
+        - season
+        - tv
     MovieDetails:
       type: object
       properties:
@@ -4566,14 +4594,15 @@ components:
     Source:
       type: string
       enum:
-        - tmdb
+        - bgg
+        - comicvine
+        - hardcover
+        - igdb
         - mal
         - mangaupdates
-        - igdb
-        - openlibrary
-        - hardcover
-        - comicvine
         - manual
+        - openlibrary
+        - tmdb
     StatisticsResponse:
       type: object
       properties:
@@ -4686,6 +4715,7 @@ components:
           description: Related seasons
           items:
             $ref: "#/components/schemas/Media"
+    # TODO: create reusable schema for updates
     UpdateAnime:
       description: |
         Payload for updating anime. All fields can be modified.
@@ -4701,6 +4731,32 @@ components:
           type: integer
           nullable: true
           description: Episode number
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateBoardGame:
+      description: |
+        Payload for updating board games. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Page number
         start_date:
           type: string
           format: date-time
