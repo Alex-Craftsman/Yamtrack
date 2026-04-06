@@ -1,4 +1,3 @@
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -2785,25 +2784,19 @@ class MediaSeasonListDetailView(drf_views.APIView):
             )
 
         try:
-            item = Item.objects.get(
-                media_id=media_id,
-                source=source,
-                media_type="season",
+            list_item = user_list.get_list_item_by_media(
+                media_id,
+                source,
+                MediaTypes.SEASON.value,
                 season_number=season_number,
             )
-        except Item.DoesNotExist:
-            return Response(
-                {"detail": get_http_message(404) + " Media not found."},
-                status=404,
-            )
-
-        if not user_list.items.filter(id=item.id).exists():
+        except CustomListItem.DoesNotExist:
             return Response(
                 {"detail": get_http_message(404) + " Media not found in the list."},
                 status=404,
             )
 
-        user_list.items.remove(item)
+        list_item.delete()
         return Response(status=204)
 
     def put(self, request, media_type, source, media_id, season_number, list_id):
@@ -3390,7 +3383,10 @@ class MediaEpisodeChangesHistoryView(drf_views.APIView):
 
         if not user_medias:
             return Response(
-                {"detail": get_http_message(404) + " Episode not found or not tracked."},
+                {
+                    "detail": get_http_message(404)
+                    + " Episode not found or not tracked."
+                },
                 status=404,
             )
 
@@ -3747,7 +3743,7 @@ class MediaEpisodeListsView(drf_views.APIView):
         return Response(paginated_data, status=200)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/lists/[list_id]/
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/lists/[list_id]/
 class MediaEpisodeListDetailView(drf_views.APIView):
     """Episode list detail view."""
 
@@ -3807,26 +3803,20 @@ class MediaEpisodeListDetailView(drf_views.APIView):
             )
 
         try:
-            item = Item.objects.get(
-                media_id=media_id,
-                source=source,
-                media_type="episode",
+            list_item = user_list.get_list_item_by_media(
+                media_id,
+                source,
+                MediaTypes.EPISODE.value,
                 season_number=season_number,
                 episode_number=episode_number,
             )
-        except Item.DoesNotExist:
-            return Response(
-                {"detail": get_http_message(404) + " Media not found."},
-                status=404,
-            )
-
-        if not user_list.items.filter(id=item.id).exists():
+        except CustomListItem.DoesNotExist:
             return Response(
                 {"detail": get_http_message(404) + " Media not found in the list."},
                 status=404,
             )
 
-        user_list.items.remove(item)
+        list_item.delete()
         return Response(status=204)
 
     def put(

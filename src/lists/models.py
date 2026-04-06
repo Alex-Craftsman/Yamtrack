@@ -99,6 +99,30 @@ class CustomList(models.Model):
             queryset = queryset.select_related("item")
         return queryset.get(list_item_id=list_item_id)
 
+    def get_list_item_by_media(
+        self,
+        media_id,
+        source,
+        media_type,
+        season_number=None,
+        episode_number=None,
+    ):
+        """Return a list item for this custom list matched by media identifiers."""
+        filters = {
+            "custom_list": self,
+            "item__media_id": media_id,
+            "item__source": source,
+            "item__media_type": media_type,
+        }
+
+        if season_number is not None:
+            filters["item__season_number"] = season_number
+
+        if episode_number is not None:
+            filters["item__episode_number"] = episode_number
+
+        return CustomListItem.objects.select_related("item").get(**filters)
+
     @property
     def image(self):
         """Return the image of the first item in the list."""
