@@ -1,8 +1,8 @@
-from .base import ApiTestCase
+from .base import YamtrackApiTestCase
 from .endpoints import get_endpoint_cases
 
 
-class AuthenticationMatrixTests(ApiTestCase):
+class AuthenticationMatrixTests(YamtrackApiTestCase):
     """Assert protected endpoints reject missing or invalid credentials."""
 
     def test_protected_endpoints_require_authentication(self):
@@ -22,7 +22,7 @@ class AuthenticationMatrixTests(ApiTestCase):
                     args=case.args,
                     payload=case.payload,
                 )
-                self.assertIn(response.status_code, [401, 403])
+                self.assertEqual(response.status_code, 403)
 
     def test_protected_endpoints_reject_invalid_token(self):
         """Protected endpoints must reject requests with invalid API keys."""
@@ -42,4 +42,4 @@ class AuthenticationMatrixTests(ApiTestCase):
                     payload=case.payload,
                     headers=self.invalid_auth_headers,
                 )
-                self.assertIn(response.status_code, [401, 403])
+                self.assertEqual(response.status_code, 403)

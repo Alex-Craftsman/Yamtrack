@@ -1,8 +1,10 @@
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+from rest_framework.test import APITestCase
 
 from app.models import (
     TV,
@@ -10,6 +12,7 @@ from app.models import (
     BoardGame,
     Book,
     Comic,
+    Episode,
     Game,
     Item,
     Manga,
@@ -19,9 +22,11 @@ from app.models import (
     Sources,
     Status,
 )
+from events.models import Event
+from lists.models import CustomList, CustomListItem
 
 
-class ApiTestCase(TestCase):
+class YamtrackApiTestCase(APITestCase):
     """Shared setup and request helpers for API endpoint tests."""
 
     def setUp(self):
@@ -45,7 +50,7 @@ class ApiTestCase(TestCase):
         self.addCleanup(self._fetch_releases_patcher.stop)
 
         self._metadata_patcher = patch(
-            "app.models.providers.services.get_media_metadata",
+            "api.views.services.get_media_metadata",
             return_value={
                 "max_progress": None,
                 "related": {"seasons": [], "recommendations": []},
@@ -295,7 +300,6 @@ class ApiTestCase(TestCase):
                     image="https://example.com/boardgame-3.jpg",
                 ),
             ],
-
         }
 
         # Various tracked medias for user1.
@@ -332,7 +336,6 @@ class ApiTestCase(TestCase):
             for item in self.items_by_type[MediaTypes.BOARDGAME.value]
         ]
 
-
         self.season_medias = [
             Season.objects.create(
                 item=item,
@@ -343,7 +346,106 @@ class ApiTestCase(TestCase):
             for item in self.items_by_type[MediaTypes.SEASON.value]
         ]
 
+        self.episode_medias = Episode.objects.bulk_create(
+            [
+                Episode(
+                    item=item,
+                    related_season=self.season_medias[0],
+                )
+                for item in self.items_by_type[MediaTypes.EPISODE.value]
+            ],
+        )
+
+        self.calendar_events = [
+            Event.objects.create(
+                item=item,
+                content_number=None,
+                datetime=timezone.now(),
+            )
+            for item in self.items_by_type["movie"]
+        ]
+        self.calendar_events += [
+            Event.objects.create(
+                item=self.items_by_type["manga"][0],
+                content_number=None,
+                datetime=timezone.now() - timezone.timedelta(days=10),
+            )
+        ]
+        self.calendar_events += [
+            Event.objects.create(
+                item=self.items_by_type["comic"][0],
+                content_number=None,
+                datetime=timezone.now() + timezone.timedelta(days=10),
+            )
+        ]
+
+
+        self._build_lists_fixtures()
+
         self._build_changes_history_fixtures()
+
+    def _build_lists_fixtures(self):
+        """Create reusable lists with linked media items for endpoint tests."""
+        self.lists_by_name = {
+            "favorites": CustomList.objects.create(
+                name="Favorites",
+                description="Primary seeded list",
+                owner=self.user1,
+            ),
+            "watching": CustomList.objects.create(
+                name="Watching Now",
+                description="Secondary seeded list",
+                owner=self.user1,
+            ),
+            "shared": CustomList.objects.create(
+                name="Shared Picks",
+                description="Shared list between fixtures users",
+                owner=self.user1,
+            ),
+        }
+        self.lists_by_name["shared"].collaborators.add(self.user2)
+
+        seeded_items = [
+            (
+                self.lists_by_name["favorites"],
+                self.items_by_type[MediaTypes.MOVIE.value][0],
+            ),
+            (
+                self.lists_by_name["favorites"],
+                self.items_by_type[MediaTypes.TV.value][0],
+            ),
+            (
+                self.lists_by_name["favorites"],
+                self.items_by_type[MediaTypes.ANIME.value][0],
+            ),
+            (
+                self.lists_by_name["watching"],
+                self.items_by_type[MediaTypes.TV.value][1],
+            ),
+            (
+                self.lists_by_name["watching"],
+                self.items_by_type[MediaTypes.SEASON.value][0],
+            ),
+            (
+                self.lists_by_name["shared"],
+                self.items_by_type[MediaTypes.MANGA.value][0],
+            ),
+            (
+                self.lists_by_name["shared"],
+                self.items_by_type[MediaTypes.BOOK.value][0],
+            ),
+            (
+                self.lists_by_name["shared"],
+                self.items_by_type[MediaTypes.COMIC.value][1],
+            ),
+        ]
+
+        self.list_items = CustomListItem.objects.bulk_create(
+            [
+                CustomListItem(custom_list=custom_list, item=item)
+                for custom_list, item in seeded_items
+            ],
+        )
 
     def _build_changes_history_fixtures(self):
         """Create history rows linked to user1 for changes-history endpoint tests."""
@@ -392,13 +494,64 @@ class ApiTestCase(TestCase):
             .first(),
         }
 
-    def call_api(self, method, url_name, args=(), payload=None, headers=None):
+    def build_episode_metadata(
+        self,
+        tv_item,
+        season_number,
+        episode_number,
+        title,
+        image,
+        synopsis="episode synopsis",
+        score=8.5,
+        score_count=50,
+    ):
+        """Build season metadata payload containing one episode entry."""
+        return {
+            "media_id": tv_item.media_id,
+            "source": tv_item.source,
+            "media_type": MediaTypes.TV.value,
+            "season_number": season_number,
+            "source_url": f"https://example.com/season/{season_number}",
+            "title": title,
+            "image": image,
+            "max_progress": 1,
+            "synopsis": synopsis,
+            "genres": [],
+            "score": score,
+            "score_count": score_count,
+            "details": {},
+            "related": {},
+            "episodes": [
+                {
+                    "episode_number": int(episode_number),
+                    "season_number": int(season_number),
+                    "name": title,
+                    "overview": synopsis,
+                    "vote_average": score,
+                    "vote_count": score_count,
+                    "air_date": None,
+                    "runtime": None,
+                    "episode_type": None,
+                    "crew": [],
+                    "guest_stars": [],
+                    "still_path": None,
+                },
+            ],
+        }
+
+    def call_api(
+        self, method, url_name, args=(), params=None, payload=None, headers=None
+    ):
         """Call an API endpoint using a named URL and optional payload."""
         request_method = getattr(self.client, method.lower())
         request_kwargs = dict(headers or {})
+
+        url = reverse(url_name, args=args)
+        if params:
+            request_kwargs["QUERY_STRING"] = urlencode(params, doseq=True)
 
         if payload is not None:
             request_kwargs["data"] = payload
             request_kwargs["content_type"] = "application/json"
 
-        return request_method(reverse(url_name, args=args), **request_kwargs)
+        return request_method(url, **request_kwargs)
