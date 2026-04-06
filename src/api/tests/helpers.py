@@ -56,9 +56,9 @@ def check_health_structure(test_case, item):
     test_case.assertIn("timestamp", item)
     test_case.assertIn("checks", item)
     for check in item["checks"].values():
-            test_case.assertIn("status", check)
-            test_case.assertIn(check["status"], ["ok", "error"])
-            test_case.assertIn("error", check)
+        test_case.assertIn("status", check)
+        test_case.assertIn(check["status"], ["ok", "error"])
+        test_case.assertIn("error", check)
 
 
 def check_info_structure(test_case, item):
@@ -76,6 +76,22 @@ def check_info_structure(test_case, item):
     test_case.assertEqual(item["admin_enabled"], settings.ADMIN_ENABLED)
     test_case.assertIn("track_time", item)
     test_case.assertEqual(item["track_time"], settings.TRACK_TIME)
+
+
+def check_statistics_structure(test_case, item):
+    """Assert that the given item follows the expected statistics structure."""
+    test_case.assertIn("start_date", item)
+    test_case.assertIn("end_date", item)
+    test_case.assertIn("media_count", item)
+    test_case.assertIn("activity_data", item)
+    test_case.assertIn("media_type_distribution", item)
+    test_case.assertIn("score_distribution", item)
+    test_case.assertIn("top_rated", item)
+    test_case.assertIn("status_distribution", item)
+    test_case.assertIn("status_pie_chart_data", item)
+    test_case.assertIn("timeline", item)
+    test_case.assertIsInstance(item["media_count"], dict)
+    test_case.assertIn("total", item["media_count"])
 
 
 def check_item_structure(test_case, item):
