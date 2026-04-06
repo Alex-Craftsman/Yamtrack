@@ -1281,6 +1281,12 @@ class MediaChangesHistoryView(drf_views.APIView):
             source,
         )
 
+        if not user_medias:
+            return Response(
+                {"detail": get_http_message(404) + " Media not found or not tracked."},
+                status=404,
+            )
+
         entries = get_changes_history_entries(user_medias, media_type)
 
         paginated_data = paginate_data(
@@ -2267,7 +2273,13 @@ class MediaSeasonChangesHistoryView(drf_views.APIView):
             season_number=season_number,
         )
 
-        entries = get_changes_history_entries(user_medias, media_type)
+        if not user_medias:
+            return Response(
+                {"detail": get_http_message(404) + " Season not found or not tracked."},
+                status=404,
+            )
+
+        entries = get_changes_history_entries(user_medias, MediaTypes.SEASON.value)
 
         paginated_data = paginate_data(
             request,
@@ -2278,7 +2290,7 @@ class MediaSeasonChangesHistoryView(drf_views.APIView):
         paginated_data["results"] = serialize_data(
             paginated_data["results"],
             many=True,
-            context={"media_type": media_type},
+            context={"media_type": MediaTypes.SEASON.value},
             serializer_class=ChangesHistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
@@ -3376,7 +3388,13 @@ class MediaEpisodeChangesHistoryView(drf_views.APIView):
             episode_number=episode_number,
         )
 
-        entries = get_changes_history_entries(user_medias, media_type)
+        if not user_medias:
+            return Response(
+                {"detail": get_http_message(404) + " Episode not found or not tracked."},
+                status=404,
+            )
+
+        entries = get_changes_history_entries(user_medias, MediaTypes.EPISODE.value)
 
         paginated_data = paginate_data(
             request,
@@ -3387,7 +3405,7 @@ class MediaEpisodeChangesHistoryView(drf_views.APIView):
         paginated_data["results"] = serialize_data(
             paginated_data["results"],
             many=True,
-            context={"request": request, "media_type": media_type},
+            context={"request": request, "media_type": MediaTypes.EPISODE.value},
             serializer_class=ChangesHistoryEntrySerializer,
         )
         return Response(paginated_data, status=200)
