@@ -1,5 +1,3 @@
-from calendar import monthrange
-from datetime import date
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -51,6 +49,7 @@ from .helpers import (
     parse_limit_offset,
     parse_sort_filter,
     parse_status_param,
+    resolve_calendar_date_range,
     try_parse_date,
     validate_body,
 )
@@ -104,32 +103,12 @@ class CalendarView(drf_views.APIView):
             return err
 
         try:
-            if start_date:
-                first_day = try_parse_date(start_date)
-                last_day = try_parse_date(end_date) if end_date else localdate()
-            else:
-                try:
-                    if year_q:
-                        year = int(year_q)
-                        if month_q:
-                            month = int(month_q)
-                            first_day = date(year, month, 1)
-                            last_day = date(year, month, monthrange(year, month)[1])
-                        else:
-                            first_day = date(year, 1, 1)
-                            last_day = date(year, 12, 31)
-                    else:
-                        current = localdate()
-                        year = current.year
-                        month = current.month
-                        first_day = date(year, month, 1)
-                        last_day = date(year, month, monthrange(year, month)[1])
-                except (TypeError, ValueError):
-                    current = localdate()
-                    year = current.year
-                    month = current.month
-                    first_day = date(year, month, 1)
-                    last_day = date(year, month, monthrange(year, month)[1])
+            first_day, last_day = resolve_calendar_date_range(
+                start_date,
+                end_date,
+                month_q,
+                year_q,
+            )
         except (TypeError, ValueError):
             return Response(
                 {"detail": get_http_message(400) + " Invalid date format."},
@@ -3097,6 +3076,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
     def get(self, request, media_type, source, media_id, season_number, episode_number):
         """Retrieve details of a specific episode for the authenticated user."""
         user = request.user
+        episode = None
 
         if not check_valid_type(media_type):
             return Response(
@@ -3154,11 +3134,11 @@ class MediaEpisodeDetailView(drf_views.APIView):
                 None,
             )
 
-            if not episode:
-                return Response(
-                    {"detail": get_http_message(404) + " Episode not found."},
-                    status=404,
-                )
+        if not episode:
+            return Response(
+                {"detail": get_http_message(404) + " Episode not found."},
+                status=404,
+            )
 
         try:
             user_medias = BasicMedia.objects.filter_media_prefetch(

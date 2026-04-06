@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.23
+  version: 0.0.24
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -37,7 +37,7 @@ paths:
           schema:
             type: string
             format: date
-          description: The end date to retrieve events for. If it's not specified the default is today (YYYY-MM-DD)
+          description: The end date to retrieve events for. If omitted with start_date, defaults to the end of that month; otherwise defaults to the end of the selected/current month (YYYY-MM-DD)
         - in: query
           name: limit
           schema:

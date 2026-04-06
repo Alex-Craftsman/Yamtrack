@@ -1,8 +1,11 @@
 import logging
+from calendar import monthrange
+from datetime import date
 from urllib.parse import urlencode
 
 from django.db.models import OuterRef, Subquery
 from django.utils.dateparse import parse_date
+from django.utils.timezone import localdate
 from rest_framework.response import Response
 
 from app.models import (
@@ -474,6 +477,44 @@ def parse_status_param(status):
         return get_media_status(int(status), reverse=True)
     except (TypeError, ValueError):
         return None
+
+
+def get_month_range(year, month):
+    """Return the first and last day for a given month."""
+    first_day = date(year, month, 1)
+    last_day = date(year, month, monthrange(year, month)[1])
+    return first_day, last_day
+
+
+def get_current_month_range():
+    """Return the date range for the current month."""
+    current = localdate()
+    return get_month_range(current.year, current.month)
+
+
+def resolve_calendar_date_range(start_date, end_date, month_q, year_q):
+    """Resolve calendar query params into a concrete (first_day, last_day) tuple."""
+    if start_date or end_date:
+        parsed_start = try_parse_date(start_date) if start_date else None
+        parsed_end = try_parse_date(end_date) if end_date else None
+
+        first_day = parsed_start if parsed_start else date(1970, 1, 1)
+        if parsed_end:
+            return first_day, parsed_end
+        if parsed_start:
+            _, last_day = get_month_range(parsed_start.year, parsed_start.month)
+            return first_day, last_day
+        return first_day, get_current_month_range()[1]
+
+    if not year_q:
+        return get_current_month_range()
+
+    year = int(year_q)
+    if not month_q:
+        return date(year, 1, 1), date(year, 12, 31)
+
+    month = int(month_q)
+    return get_month_range(year, month)
 
 
 def try_parse_date(value):
