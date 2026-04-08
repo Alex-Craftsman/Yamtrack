@@ -57,6 +57,18 @@ class StatusField(serializers.Field):
 class ItemSerializer(serializers.ModelSerializer):
     """Serializer used for item details."""
 
+    media_id = serializers.SerializerMethodField()
+
+    def get_media_id(self, obj):
+        """Return numeric media_id when the stored value is numeric."""
+        media_id = getattr(obj, "media_id", None)
+        if media_id is None:
+            return None
+        try:
+            return int(media_id)
+        except (TypeError, ValueError):
+            return media_id
+
     class Meta:  # noqa: D106
         model = Item
         exclude = ("id",)

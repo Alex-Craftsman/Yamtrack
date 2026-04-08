@@ -4061,7 +4061,7 @@ components:
       type: object
       properties:
         media_id:
-          type: string
+          type: integer
         source:
           $ref: "#/components/schemas/Source"
         media_type:
