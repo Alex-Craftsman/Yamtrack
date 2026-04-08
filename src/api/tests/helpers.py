@@ -37,6 +37,39 @@ def check_changes_history_entry_structure(test_case, item):
         check_changes_history_change_structure(test_case, change)
 
 
+def check_complete_media_structure(test_case, item):
+    """Assert that the given item follows the complete media structure."""
+    test_case.assertIn("id", item)
+    test_case.assertIn("media_id", item)
+    test_case.assertIn("source", item)
+    test_case.assertIn("source_url", item)
+    test_case.assertIn("media_type", item)
+    test_case.assertIn("title", item)
+    test_case.assertIn("image", item)
+    test_case.assertIn("synopsis", item)
+    test_case.assertIn("genres", item)
+    test_case.assertIn("score", item)
+    test_case.assertIn("score_count", item)
+    test_case.assertIn("details", item)
+    check_details_structure(test_case, item["media_type"], item["details"])
+    test_case.assertIn("related", item)
+    check_related_structure(test_case, item["media_type"], item["related"])
+    test_case.assertIn("item_id", item)
+    check_item_id_structure(test_case, item["item_id"])
+    test_case.assertIn("parent_id", item)
+    check_item_id_structure(test_case, item["parent_id"]) if item[
+        "parent_id"
+    ] else test_case.assertIsNone(item["parent_id"])
+    test_case.assertIn("tracked", item)
+    test_case.assertIn("consumptions_number", item)
+    test_case.assertIn("consumptions", item)
+    for consumption in item["consumptions"]:
+        check_consumption_structure(test_case, consumption)
+    test_case.assertIn("lists", item)
+    for lst in item["lists"]:
+        check_minimized_lists_structure(test_case, lst)
+
+
 def check_consumption_structure(test_case, item):
     """Assert that the given item follows the expected consumption structure."""
     test_case.assertIn("consumption_id", item)
@@ -47,6 +80,230 @@ def check_consumption_structure(test_case, item):
     test_case.assertIn("start_date", item)
     test_case.assertIn("end_date", item)
     test_case.assertIn("notes", item)
+
+
+def check_crew_member_structure(test_case, item):
+    """Assert that the given item follows the expected crew member structure."""
+    test_case.assertIn("job", item)
+    test_case.assertIn("department", item)
+    test_case.assertIn("credit_id", item)
+    test_case.assertIn("adult", item)
+    test_case.assertIn("gender", item)
+    test_case.assertIn("id", item)
+    test_case.assertIn("known_for_department", item)
+    test_case.assertIn("name", item)
+    test_case.assertIn("original_name", item)
+    test_case.assertIn("popularity", item)
+    test_case.assertIn("profile_path", item)
+
+
+def check_guest_star_structure(test_case, item):
+    """Assert that the given item follows the expected guest star structure."""
+    test_case.assertIn("character", item)
+    test_case.assertIn("credit_id", item)
+    test_case.assertIn("order", item)
+    test_case.assertIn("adult", item)
+    test_case.assertIn("gender", item)
+    test_case.assertIn("id", item)
+    test_case.assertIn("known_for_department", item)
+    test_case.assertIn("name", item)
+    test_case.assertIn("original_name", item)
+    test_case.assertIn("popularity", item)
+    test_case.assertIn("profile_path", item)
+
+
+def check_details_structure(test_case, media_type, details):
+    """Assert that the given details dict follows the expected structure."""
+    functions = {
+        "anime": _check_anime_details_structure,
+        "board_game": _check_board_game_details_structure,
+        "book": _check_book_details_structure,
+        "comic": _check_comic_details_structure,
+        "episode": _check_episode_details_structure,
+        "game": _check_game_details_structure,
+        "manga": _check_manga_details_structure,
+        "movie": _check_movie_details_structure,
+        "season": _check_season_details_structure,
+        "tv": _check_tv_details_structure,
+    }
+    if media_type in functions:
+        functions[media_type](test_case, details)
+
+def check_related_structure(test_case, media_type, related):
+    """Assert that the given related dict follows the expected structure."""
+    functions = {
+        "anime": _check_anime_related_structure,
+        "board_game": _check_board_game_related_structure,
+        "book": _check_book_related_structure,
+        "comic": _check_comic_related_structure,
+        "episode": _check_episode_related_structure,
+        "game": _check_game_related_structure,
+        "manga": _check_manga_related_structure,
+        "movie": _check_movie_related_structure,
+        "season": _check_season_related_structure,
+        "tv": _check_tv_related_structure,
+    }
+    if media_type in functions:
+        functions[media_type](test_case, related)
+
+def _check_anime_details_structure(test_case, details):
+    """Assert that the given anime details dict follows the expected structure."""
+
+
+def _check_anime_related_structure(test_case, related):
+    """Assert that the given anime related dict follows the expected structure."""
+
+
+def _check_board_game_details_structure(test_case, details):
+    """Assert that the given board game details dict follows the expected structure."""
+    test_case.assertIn("year", details)
+    test_case.assertIn("players", details)
+    test_case.assertIn("playtime", details)
+    test_case.assertIn("min_age", details)
+    test_case.assertIn("designers", details)
+    test_case.assertIn("publishers", details)
+
+
+def _check_board_game_related_structure(test_case, related):
+    """Assert that the given board game related dict follows the expected structure."""
+
+
+def _check_book_details_structure(test_case, details):
+    """Assert that the given book details dict follows the expected structure."""
+    test_case.assertIn("format", details)
+    test_case.assertIn("number_of_pages", details)
+    test_case.assertIn("publish_date", details)
+    test_case.assertIn("author", details)
+    test_case.assertIn("publisher", details)
+    test_case.assertIn("isbn", details)
+
+
+def _check_book_related_structure(test_case, related):
+    """Assert that the given book related dict follows the expected structure."""
+
+
+def _check_comic_details_structure(test_case, details):
+    """Assert that the given comic details dict follows the expected structure."""
+    test_case.assertIn("start_date", details)
+    test_case.assertIn("publisher", details)
+    test_case.assertIn("issues_count", details)
+    test_case.assertIn("last_issue_name", details)
+    test_case.assertIn("last_issue_number", details)
+    test_case.assertIn("people", details)
+    test_case.assertIn("last_updated", details)
+    test_case.assertIn("last_issue_id", details)
+
+
+def _check_comic_related_structure(test_case, related):
+    """Assert that the given comic related dict follows the expected structure."""
+    test_case.assertIn("from_the_same_publisher", related)
+    for item in related["from_the_same_publisher"]:
+        test_case.assertIn("media_id", item)
+        test_case.assertIn("source", item)
+        test_case.assertIn("media_type", item)
+        test_case.assertIn("title", item)
+        test_case.assertIn("image", item)
+
+
+def _check_episode_details_structure(test_case, details):
+    """Assert that the given episode details dict follows the expected structure."""
+    test_case.assertIn("air_date", details)
+    test_case.assertIn("episode_number", details)
+    test_case.assertIn("season_number", details)
+    test_case.assertIn("runtime", details)
+    test_case.assertIn("episode_type", details)
+    test_case.assertIn("crew", details)
+    for crew_member in details["crew"]:
+        check_crew_member_structure(test_case, crew_member)
+    test_case.assertIn("guest_stars", details)
+    for guest_star in details["guest_stars"]:
+        check_guest_star_structure(test_case, guest_star)
+
+
+def _check_episode_related_structure(test_case, related):
+    """Assert that the given episode related dict follows the expected structure."""
+
+
+def _check_game_details_structure(test_case, details):
+    """Assert that the given game details dict follows the expected structure."""
+    test_case.assertIn("format", details)
+    test_case.assertIn("release_date", details)
+    test_case.assertIn("themes", details)
+    test_case.assertIn("platforms", details)
+
+
+def _check_game_related_structure(test_case, related):
+    """Assert that the given game related dict follows the expected structure."""
+    test_case.assertIn("parent_game", related)
+    test_case.assertIn("remasters", related)
+    test_case.assertIn("remakes", related)
+    test_case.assertIn("expansions", related)
+    test_case.assertIn("standalone_expansions", related)
+    test_case.assertIn("expanded_games", related)
+
+
+def _check_manga_details_structure(test_case, details):
+    """Assert that the given manga details dict follows the expected structure."""
+
+
+def _check_manga_related_structure(test_case, related):
+    """Assert that the given manga related dict follows the expected structure."""
+
+
+def _check_movie_details_structure(test_case, details):
+    """Assert that the given movie details dict follows the expected structure."""
+    test_case.assertIn("format", details)
+    test_case.assertIn("release_date", details)
+    test_case.assertIn("status", details)
+    test_case.assertIn("runtime", details)
+    test_case.assertIn("studios", details)
+    test_case.assertIn("country", details)
+    test_case.assertIn("languages", details)
+
+
+def _check_movie_related_structure(test_case, related):
+    """Assert that the given movie related dict follows the expected structure."""
+
+
+def _check_season_details_structure(test_case, details):
+    """Assert that the given season details dict follows the expected structure."""
+    test_case.assertIn("first_air_date", details)
+    test_case.assertIn("last_air_date", details)
+    test_case.assertIn("episodes", details)
+    test_case.assertIn("runtime", details)
+    test_case.assertIn("total_runtime", details)
+    test_case.assertIn("tvdb_id", details)
+
+
+def _check_season_related_structure(test_case, related):
+    """Assert that the given season related dict follows the expected structure."""
+    test_case.assertIn("episodes", related)
+    for episode in related["episodes"]:
+        check_media_structure(test_case, episode)
+
+
+def _check_tv_details_structure(test_case, details):
+    """Assert that the given TV details dict follows the expected structure."""
+    test_case.assertIn("format", details)
+    test_case.assertIn("first_air_date", details)
+    test_case.assertIn("last_air_date", details)
+    test_case.assertIn("status", details)
+    test_case.assertIn("seasons", details)
+    test_case.assertIn("episodes", details)
+    test_case.assertIn("runtime", details)
+    test_case.assertIn("studios", details)
+    test_case.assertIn("country", details)
+    test_case.assertIn("languages", details)
+    test_case.assertIn("tvdb_id", details)
+    test_case.assertIn("last_episode_season", details)
+    test_case.assertIn("next_episode_season", details)
+
+
+def _check_tv_related_structure(test_case, related):
+    """Assert that the given TV related dict follows the expected structure."""
+    test_case.assertIn("seasons", related)
+    for season in related["seasons"]:
+        check_media_structure(test_case, season)
 
 
 def check_health_structure(test_case, item):
@@ -109,7 +366,7 @@ def check_item_id_structure(test_case, item):
     """Assert that the given item ID follows the expected structure."""
     test_case.assertIsInstance(item, str)
     parts = item.split("/")
-    test_case.assertEqual(len(parts), 3)
+    test_case.assertIn(len(parts), [3, 4, 5])
 
 
 def check_media_structure(test_case, item):
