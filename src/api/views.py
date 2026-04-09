@@ -1347,6 +1347,12 @@ class MediaConsumptionHistoryView(drf_views.APIView):
                 status=500,
             )
 
+        if not user_medias:
+            return Response(
+                {"detail": get_http_message(404) + " Media not found or not tracked."},
+                status=404,
+            )
+
         # TODO: missing sorting
         paginated_data = paginate_data(
             request,
