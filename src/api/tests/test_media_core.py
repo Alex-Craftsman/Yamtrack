@@ -4,6 +4,7 @@ from app.models import MediaTypes, Sources, Status
 
 from .base import YamtrackApiTestCase
 from .helpers import (
+    check_changes_history_record_structure,
     check_complete_media_structure,
     check_consumption_structure,
     check_media_structure,
@@ -322,9 +323,7 @@ class MediaCoreTests(YamtrackApiTestCase):
             "max_progress": 11,
             "image": "https://image.tmdb.org/t/p/w500/rnahKduAA2VZFgrXemu97Fh6OD2.jpg",
             "synopsis": "Haru Satonaka is the captain of an ice-hockey team, a star athlete who stakes everything on hockey but can only consider love as a game. Aki Murase is a woman who has been waiting for her lover who went abroad two years ago. These two persons start a relationship while frankly admitting to each other that it is only a love game. …The result is the unfolding of a drama of people with their respective pasts and with their pride as individuals.",
-            "genres": [
-                "Drama"
-            ],
+            "genres": ["Drama"],
             "score": 7.8,
             "score_count": 30,
             "details": {
@@ -335,44 +334,40 @@ class MediaCoreTests(YamtrackApiTestCase):
                 "seasons": 1,
                 "episodes": 11,
                 "runtime": "1h 0m",
-                "studios": [
-                "Fuji Television Network"
-                ],
+                "studios": ["Fuji Television Network"],
                 "country": "Japan",
-                "languages": [
-                "Japanese"
-                ],
+                "languages": ["Japanese"],
                 "tvdb_id": 84831,
                 "last_episode_season": 1,
-                "next_episode_season": None
+                "next_episode_season": None,
             },
             "related": {
                 "seasons": [
-                {
-                    "id": None,
-                    "consumption_id": None,
-                    "item": {
-                    "media_id": 1,
-                    "source": "tmdb",
-                    "media_type": "season",
-                    "title": "Season 1",
-                    "image": "https://image.tmdb.org/t/p/w500/nCcGD18HmDFunCl8KBigqUPlIi8.jpg",
-                    "season_number": 1,
-                    "episode_number": None
-                    },
-                    "item_id": "tv/tmdb/1/1",
-                    "parent_id": "tv/tmdb/1",
-                    "tracked": False,
-                    "created_at": None,
-                    "score": None,
-                    "status": None,
-                    "progress": None,
-                    "progressed_at": None,
-                    "start_date": None,
-                    "end_date": None,
-                    "notes": None,
-                    "lists": []
-                }
+                    {
+                        "id": None,
+                        "consumption_id": None,
+                        "item": {
+                            "media_id": 1,
+                            "source": "tmdb",
+                            "media_type": "season",
+                            "title": "Season 1",
+                            "image": "https://image.tmdb.org/t/p/w500/nCcGD18HmDFunCl8KBigqUPlIi8.jpg",
+                            "season_number": 1,
+                            "episode_number": None,
+                        },
+                        "item_id": "tv/tmdb/1/1",
+                        "parent_id": "tv/tmdb/1",
+                        "tracked": False,
+                        "created_at": None,
+                        "score": None,
+                        "status": None,
+                        "progress": None,
+                        "progressed_at": None,
+                        "start_date": None,
+                        "end_date": None,
+                        "notes": None,
+                        "lists": [],
+                    }
                 ]
             },
             "item_id": "tv/tmdb/1",
@@ -380,7 +375,7 @@ class MediaCoreTests(YamtrackApiTestCase):
             "tracked": False,
             "consumptions_number": 0,
             "consumptions": [],
-            "lists": []
+            "lists": [],
         }
 
         response = self.call_api(
@@ -416,6 +411,119 @@ class MediaCoreTests(YamtrackApiTestCase):
 
         self.assertEqual(response.status_code, 500)
 
+    @patch("api.views.services.get_media_metadata")
+    def test_media_detail_patch_updates_media_fields(self, mock_metadata):
+        """Media detail PATCH should update mutable media fields."""
+        # TODO: Use real mock data fixtures instead of hardcoding values
+        status = 2
+        score = 8
+        notes = "Great TV show!"
+        tv_item = self.items_by_type[MediaTypes.TV.value][0]
+        mock_metadata.return_value = {
+            "id": None,
+            "media_id": 1,
+            "source": "tmdb",
+            "source_url": "https://www.themoviedb.org/tv/1",
+            "media_type": "tv",
+            "title": "Pride",
+            "max_progress": 11,
+            "image": "https://image.tmdb.org/t/p/w500/rnahKduAA2VZFgrXemu97Fh6OD2.jpg",
+            "synopsis": "Haru Satonaka is the captain of an ice-hockey team, a star athlete who stakes everything on hockey but can only consider love as a game. Aki Murase is a woman who has been waiting for her lover who went abroad two years ago. These two persons start a relationship while frankly admitting to each other that it is only a love game. …The result is the unfolding of a drama of people with their respective pasts and with their pride as individuals.",
+            "genres": ["Drama"],
+            "score": 7.8,
+            "score_count": 30,
+            "details": {
+                "format": "TV",
+                "first_air_date": "2004-01-12",
+                "last_air_date": "2004-03-22",
+                "status": "Ended",
+                "seasons": 1,
+                "episodes": 11,
+                "runtime": "1h 0m",
+                "studios": ["Fuji Television Network"],
+                "country": "Japan",
+                "languages": ["Japanese"],
+                "tvdb_id": 84831,
+                "last_episode_season": 1,
+                "next_episode_season": None,
+            },
+            "related": {
+                "seasons": [
+                    {
+                        "id": None,
+                        "consumption_id": None,
+                        "item": {
+                            "media_id": 1,
+                            "source": "tmdb",
+                            "media_type": "season",
+                            "title": "Season 1",
+                            "image": "https://image.tmdb.org/t/p/w500/nCcGD18HmDFunCl8KBigqUPlIi8.jpg",
+                            "season_number": 1,
+                            "episode_number": None,
+                        },
+                        "item_id": "tv/tmdb/1/1",
+                        "parent_id": "tv/tmdb/1",
+                        "tracked": False,
+                        "created_at": None,
+                        "score": None,
+                        "status": None,
+                        "progress": None,
+                        "progressed_at": None,
+                        "start_date": None,
+                        "end_date": None,
+                        "notes": None,
+                        "lists": [],
+                    }
+                ]
+            },
+            "item_id": "tv/tmdb/1",
+            "parent_id": None,
+            "tracked": True,
+            "consumptions_number": 0,
+            "consumptions": [],
+            "lists": [],
+        }
+
+        response = self.call_api(
+            "patch",
+            "api_media_detail",
+            args=(MediaTypes.TV.value, tv_item.source, tv_item.media_id),
+            payload={"status": status, "score": score, "notes": notes},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        check_complete_media_structure(self, payload)
+        self.assertEqual(payload["consumptions"][0]["status"], status)
+        self.assertEqual(payload["consumptions"][0]["score"], score)
+        self.assertEqual(payload["consumptions"][0]["notes"], notes)
+
+    def test_media_detail_patch_invalid_type_returns_bad_request(self):
+        """Media detail PATCH should reject unsupported media types."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        response = self.call_api(
+            "patch",
+            "api_media_detail",
+            args=("invalid", movie_item.source, movie_item.media_id),
+            payload={"status": 3},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_media_detail_patch_invalid_media_id_returns_not_found(self):
+        """Media detail PATCH should return not found for unknown provider ids."""
+        response = self.call_api(
+            "patch",
+            "api_media_detail",
+            args=(MediaTypes.MOVIE.value, "tmdb", 999999),
+            payload={"status": 3},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_media_detail_patch_with_unknown_field_returns_bad_request(self):
         """Media PATCH should reject fields outside the allowed whitelist."""
         movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
@@ -429,3 +537,599 @@ class MediaCoreTests(YamtrackApiTestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("no valid fields", response.json().get("detail", "").lower())
+
+    def test_media_changes_history_returns_paginated_payload(self):
+        """Changes history endpoint should return change entries."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        response = self.call_api(
+            "get",
+            "api_media_changes_history",
+            args=(MediaTypes.MOVIE.value, movie_item.source, movie_item.media_id),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("pagination", payload)
+        check_pagination_structure(
+            self,
+            payload["pagination"],
+            total=3,
+            limit=20,
+            offset=0,
+        )
+        self.assertIn("results", payload)
+        for item in payload["results"]:
+            check_changes_history_record_structure(self, item)
+
+    def test_media_changes_history_invalid_type_returns_bad_request(self):
+        """Changes history endpoint should reject unsupported media types."""
+        response = self.call_api(
+            "get",
+            "api_media_changes_history",
+            args=("invalid", "tmdb", 501),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_media_changes_history_invalid_media_id_returns_not_found(self):
+        """Changes history endpoint should return not found for unknown provider ids."""
+        response = self.call_api(
+            "get",
+            "api_media_changes_history",
+            args=(MediaTypes.MOVIE.value, "tmdb", 999999),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_media_consumption_history_returns_paginated_payload(self):
+        """Consumption history endpoint should return consumption entries."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        response = self.call_api(
+            "get",
+            "api_media_consumption_history",
+            args=(MediaTypes.MOVIE.value, movie_item.source, movie_item.media_id),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("pagination", payload)
+        check_pagination_structure(
+            self,
+            payload["pagination"],
+            total=1,
+            limit=20,
+            offset=0,
+        )
+        self.assertIn("results", payload)
+        for item in payload["results"]:
+            check_consumption_structure(self, item)
+
+    def test_media_consumption_history_invalid_type_returns_bad_request(self):
+        """Consumption history endpoint should reject unsupported media types."""
+        response = self.call_api(
+            "get",
+            "api_media_consumption_history",
+            args=("invalid", "tmdb", 501),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_media_consumption_history_invalid_media_id_returns_not_found(self):
+        """Consumption history endpoint should return not found for unknown ids."""
+        response = self.call_api(
+            "get",
+            "api_media_consumption_history",
+            args=(MediaTypes.MOVIE.value, "tmdb", 999999),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_media_consumption_entry_detail_delete_removes_history_entry(self):
+        """Entry-detail DELETE should remove an existing consumption row."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        consumption_id = self.movie_medias[0].id
+        response = self.call_api(
+            "delete",
+            "api_media_consumption_entry_detail",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                consumption_id,
+            ),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 204)
+
+        get_response = self.call_api(
+            "get",
+            "api_media_consumption_entry_detail",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                consumption_id,
+            ),
+            headers=self.auth_headers,
+        )
+        self.assertEqual(get_response.status_code, 404)
+
+    def test_media_consumption_entry_detail_get_returns_expected_structure(self):
+        """Entry-detail endpoint should return a complete serialized payload."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        consumption_id = self.movie_medias[0].id
+        response = self.call_api(
+            "get",
+            "api_media_consumption_entry_detail",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                consumption_id,
+            ),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        check_consumption_structure(self, payload)
+
+    def test_media_consumption_entry_detail_invalid_type_methods(self):
+        """Entry-detail endpoints should reject unsupported media types."""
+        for method in ["get", "patch", "delete"]:
+            response = self.call_api(
+                method,
+                "api_media_consumption_entry_detail",
+                args=("invalid", "tmdb", 501, 1),
+                payload={"notes": "x"} if method == "patch" else None,
+                headers=self.auth_headers,
+            )
+            self.assertEqual(response.status_code, 400)
+
+    def test_media_consumption_entry_detail_invalid_media_id_methods(self):
+        """Entry-detail endpoints should return not found for unknown media ids."""
+        for method in ["get", "patch", "delete"]:
+            response = self.call_api(
+                method,
+                "api_media_consumption_entry_detail",
+                args=(MediaTypes.MOVIE.value, "tmdb", 999999, 1),
+                payload={"notes": "x"} if method == "patch" else None,
+                headers=self.auth_headers,
+            )
+            self.assertEqual(response.status_code, 404)
+
+    def test_media_consumption_entry_detail_invalid_consumption_id_methods(self):
+        """Entry-detail endpoints should return not found for unknown consumption ids."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        invalid_consumption_id = 999999
+
+        for method in ["get", "patch", "delete"]:
+            response = self.call_api(
+                method,
+                "api_media_consumption_entry_detail",
+                args=(
+                    MediaTypes.MOVIE.value,
+                    movie_item.source,
+                    movie_item.media_id,
+                    invalid_consumption_id,
+                ),
+                payload={"notes": "x"} if method == "patch" else None,
+                headers=self.auth_headers,
+            )
+            self.assertEqual(response.status_code, 404)
+
+    def test_media_consumption_entry_detail_patch_updates_history_entry(self):
+        """Entry-detail PATCH should persist valid updates."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        consumption_id = self.movie_medias[0].id
+        response = self.call_api(
+            "patch",
+            "api_media_consumption_entry_detail",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                consumption_id,
+            ),
+            payload={"notes": "updated-from-test"},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        check_consumption_structure(self, payload)
+        self.assertEqual(payload["notes"], "updated-from-test")
+
+    def test_media_consumption_entry_detail_patch_invalid_payload_returns_bad_request(
+        self,
+    ):
+        """Entry-detail PATCH should reject invalid payload values."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        consumption_id = self.movie_medias[0].id
+        response = self.call_api(
+            "patch",
+            "api_media_consumption_entry_detail",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                consumption_id,
+            ),
+            payload={"end_date": "invalid-date"},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_media_lists_get_returns_lists(self):
+        """Media list relation endpoint should return associated lists."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+
+        response = self.call_api(
+            "get",
+            "api_media_lists",
+            args=(MediaTypes.MOVIE.value, movie_item.source, movie_item.media_id),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("results", payload)
+        self.assertEqual(len(payload["results"]), 1)
+        for item in payload["results"]:
+            check_minimized_lists_structure(self, item)
+
+    def test_media_lists_get_invalid_media_id_returns_empty_results(self):
+        """Media list relation endpoint should return empty results for unknown media."""
+        response = self.call_api(
+            "get",
+            "api_media_lists",
+            args=(MediaTypes.MOVIE.value, "tmdb", 999999),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["results"], [])
+
+    def test_media_lists_invalid_type_methods(self):
+        """Media list relation endpoints should reject unsupported media types."""
+        get_response = self.call_api(
+            "get",
+            "api_media_lists",
+            args=("invalid", "tmdb", 501),
+            headers=self.auth_headers,
+        )
+        self.assertEqual(get_response.status_code, 400)
+
+        list_id = self.lists_by_name["favorites"].id
+        put_response = self.call_api(
+            "put",
+            "api_media_lists",
+            args=("invalid", "tmdb", 501, list_id),
+            payload={},
+            headers=self.auth_headers,
+        )
+        self.assertEqual(put_response.status_code, 400)
+
+        delete_response = self.call_api(
+            "delete",
+            "api_media_lists",
+            args=("invalid", "tmdb", 501, list_id),
+            headers=self.auth_headers,
+        )
+        self.assertEqual(delete_response.status_code, 400)
+
+    def test_media_list_detail_delete_removes_media_from_list(self):
+        """Media list detail DELETE should remove media from an existing list."""
+        list_id = self.lists_by_name["favorites"].id
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+
+        response = self.call_api(
+            "delete",
+            "api_media_lists",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                list_id,
+            ),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 204)
+        get_response = self.call_api(
+            "get",
+            "api_media_lists",
+            args=(MediaTypes.MOVIE.value, movie_item.source, movie_item.media_id),
+            headers=self.auth_headers,
+        )
+        self.assertEqual(get_response.status_code, 200)
+        self.assertEqual(get_response.json()["results"], [])
+
+    def test_media_list_detail_delete_invalid_media_id_returns_not_found(self):
+        """Media list detail DELETE should reject unknown media ids."""
+        list_id = self.lists_by_name["favorites"].id
+        response = self.call_api(
+            "delete",
+            "api_media_lists",
+            args=(MediaTypes.MOVIE.value, "tmdb", 999999, list_id),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_media_list_detail_delete_invalid_list_id_returns_not_found(self):
+        """Media list detail DELETE should reject unknown list ids."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        response = self.call_api(
+            "delete",
+            "api_media_lists",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                999999,
+            ),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_media_list_detail_put_adds_media_to_list(self):
+        """Media list detail PUT should add media when missing from list."""
+        list_id = self.lists_by_name["favorites"].id
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][1]
+
+        response = self.call_api(
+            "put",
+            "api_media_lists",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                list_id,
+            ),
+            payload={},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        get_response = self.call_api(
+            "get",
+            "api_media_lists",
+            args=(MediaTypes.MOVIE.value, movie_item.source, movie_item.media_id),
+            headers=self.auth_headers,
+        )
+        self.assertEqual(get_response.status_code, 200)
+        payload = get_response.json()
+        self.assertIn("results", payload)
+        for item in payload["results"]:
+            check_minimized_lists_structure(self, item)
+            self.assertEqual(item["list_id"], list_id)
+
+    def test_media_list_detail_put_invalid_media_id_returns_not_found(self):
+        """Media list detail PUT should reject unknown media ids."""
+        list_id = self.lists_by_name["favorites"].id
+        response = self.call_api(
+            "put",
+            "api_media_lists",
+            args=(MediaTypes.MOVIE.value, "tmdb", 999999, list_id),
+            payload={},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_media_list_detail_put_invalid_list_id_returns_not_found(self):
+        """Media list detail PUT should reject unknown list ids."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][1]
+        response = self.call_api(
+            "put",
+            "api_media_lists",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                999999,
+            ),
+            payload={},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    @patch("api.views.services.get_media_metadata")
+    def test_media_recommendations_returns_related_items(self, mock_metadata):
+        """Recommendations endpoint should return provider recommendations."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        recommended_item = self.items_by_type[MediaTypes.MOVIE.value][1]
+        mock_metadata.return_value = {
+            "related": {
+                "recommendations": [
+                    {
+                        "media_id": recommended_item.media_id,
+                        "source": recommended_item.source,
+                        "media_type": recommended_item.media_type,
+                        "title": recommended_item.title,
+                        "image": recommended_item.image,
+                    },
+                ],
+            },
+        }
+
+        response = self.call_api(
+            "get",
+            "api_media_recommendations",
+            args=(MediaTypes.MOVIE.value, movie_item.source, movie_item.media_id),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["media_id"], recommended_item.media_id)
+        self.assertEqual(payload[0]["title"], recommended_item.title)
+
+    def test_media_recommendations_invalid_type_returns_bad_request(self):
+        """Recommendations endpoint should reject unsupported media types."""
+        response = self.call_api(
+            "get",
+            "api_media_recommendations",
+            args=("invalid", "tmdb", 501),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch("api.views.services.get_media_metadata", side_effect=Exception("boom"))
+    def test_media_recommendations_invalid_media_id_returns_internal_server_error(
+        self,
+        _mock_metadata,
+    ):
+        """Recommendations endpoint should surface provider lookup failures."""
+        response = self.call_api(
+            "get",
+            "api_media_recommendations",
+            args=(MediaTypes.MOVIE.value, "tmdb", 999999),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 500)
+
+    @patch("api.views.services.get_media_metadata")
+    def test_media_seasons_get_returns_expected_structure(self, mock_metadata):
+        """Media seasons endpoint should return paginated media payload."""
+        tv_item = self.items_by_type[MediaTypes.TV.value][0]
+        mock_metadata.return_value = {
+            "related": {
+                "seasons": [
+                    {
+                        "season_number": 1,
+                        "season_title": "Season 1",
+                        "image": "https://example.com/season-1.jpg",
+                    },
+                    {
+                        "season_number": 2,
+                        "season_title": "Season 2",
+                        "image": "https://example.com/season-2.jpg",
+                    },
+                ],
+            },
+        }
+
+        response = self.call_api(
+            "get",
+            "api_media_seasons",
+            args=(MediaTypes.TV.value, tv_item.source, tv_item.media_id),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("pagination", payload)
+        check_pagination_structure(
+            self,
+            payload["pagination"],
+            total=2,
+            limit=20,
+            offset=0,
+        )
+        self.assertIn("results", payload)
+        self.assertEqual(len(payload["results"]), 2)
+        for item in payload["results"]:
+            check_media_structure(self, item)
+
+    def test_media_seasons_invalid_type_returns_bad_request(self):
+        """Media seasons endpoint should reject non-tv media types."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        response = self.call_api(
+            "get",
+            "api_media_seasons",
+            args=(MediaTypes.MOVIE.value, movie_item.source, movie_item.media_id),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch("api.views.services.get_media_metadata", side_effect=Exception("boom"))
+    def test_media_seasons_invalid_media_id_returns_internal_server_error(
+        self,
+        _mock_metadata,
+    ):
+        """Media seasons endpoint should surface provider lookup failures."""
+        response = self.call_api(
+            "get",
+            "api_media_seasons",
+            args=(MediaTypes.TV.value, "tmdb", 999999),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 500)
+
+    @patch("api.views.services.get_media_metadata")
+    def test_media_sync_returns_accepted_and_updates_item(self, mock_metadata):
+        """Sync endpoint should refresh metadata and return accepted."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        mock_metadata.return_value = {
+            "title": "Movie 1 Synced",
+            "image": "https://example.com/movie-1-synced.jpg",
+        }
+
+        response = self.call_api(
+            "post",
+            "api_media_sync",
+            args=(MediaTypes.MOVIE.value, movie_item.source, movie_item.media_id),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 202)
+        payload = response.json()
+        self.assertIn("Metadata synced successfully", payload["detail"])
+
+        movie_item.refresh_from_db()
+        self.assertEqual(movie_item.title, "Movie 1 Synced")
+        self.assertEqual(movie_item.image, "https://example.com/movie-1-synced.jpg")
+
+    @patch("api.views.services.get_media_metadata", side_effect=Exception("boom"))
+    def test_media_sync_invalid_media_id_returns_internal_server_error(
+        self, _mock_metadata
+    ):
+        """Sync endpoint should surface provider lookup failures."""
+        response = self.call_api(
+            "post",
+            "api_media_sync",
+            args=(MediaTypes.MOVIE.value, "tmdb", 999999),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 500)
+
+    def test_media_sync_invalid_type_returns_bad_request(self):
+        """Sync endpoint should reject unsupported media types."""
+        response = self.call_api(
+            "post",
+            "api_media_sync",
+            args=("invalid", "tmdb", 501),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_media_sync_rejects_manual_source(self):
+        """Sync endpoint should reject manual items."""
+        response = self.call_api(
+            "post",
+            "api_media_sync",
+            args=(MediaTypes.MOVIE.value, Sources.MANUAL.value, 701),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 400)

@@ -1557,7 +1557,7 @@ class MediaListsView(drf_views.APIView):
                 },
                 status=400,
             )
-
+        # TODO: if media doesn't exist in the provider it should return 404
         lists = get_item_lists(user, media_id, source, media_type)
         paginated_data = paginate_data(request, lists, limit, offset)
 
