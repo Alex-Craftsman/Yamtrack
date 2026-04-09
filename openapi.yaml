@@ -1657,6 +1657,10 @@ paths:
       responses:
         "202":
           description: Sync triggered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicResponse"
         "400":
           description: Bad Request
           content:
