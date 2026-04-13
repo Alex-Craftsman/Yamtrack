@@ -551,16 +551,24 @@ def _validate_status(filtered_body):
 def _validate_dates(filtered_body):
     """Validate and convert date fields."""
     if "start_date" in filtered_body:
-        try:
-            filtered_body["start_date"] = try_parse_date(filtered_body["start_date"])
-        except ValueError:
-            return None, "Invalid start_date format."
+        start_date = filtered_body["start_date"]
+        if start_date in (None, ""):
+            filtered_body["start_date"] = None
+        else:
+            try:
+                filtered_body["start_date"] = try_parse_date(start_date)
+            except (TypeError, ValueError):
+                return None, "Invalid start_date format."
 
     if "end_date" in filtered_body:
-        try:
-            filtered_body["end_date"] = try_parse_date(filtered_body["end_date"])
-        except ValueError:
-            return None, "Invalid end_date format."
+        end_date = filtered_body["end_date"]
+        if end_date in (None, ""):
+            filtered_body["end_date"] = None
+        else:
+            try:
+                filtered_body["end_date"] = try_parse_date(end_date)
+            except (TypeError, ValueError):
+                return None, "Invalid end_date format."
 
     return filtered_body, None
 

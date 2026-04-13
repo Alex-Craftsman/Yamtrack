@@ -3205,6 +3205,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
     ):
         """Update a tracked episode item."""
         user = request.user
+        episode = None
 
         if not check_valid_type(media_type):
             return Response(
