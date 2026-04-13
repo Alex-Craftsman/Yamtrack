@@ -402,6 +402,11 @@ class YamtrackApiTestCase(APITestCase):
                 description="Shared list between fixtures users",
                 owner=self.user1,
             ),
+            "user2_private": CustomList.objects.create(
+                name="User2 Private",
+                description="Private list owned by user2",
+                owner=self.user2,
+            ),
         }
         self.lists_by_name["shared"].collaborators.add(self.user2)
 
