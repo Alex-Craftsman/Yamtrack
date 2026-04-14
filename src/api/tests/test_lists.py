@@ -3,7 +3,7 @@ from django.urls import reverse
 from lists.models import CustomList, CustomListItem
 
 from .base import YamtrackApiTestCase
-from .helpers import check_minimized_lists_structure, check_pagination_structure
+from .helpers import check_complete_lists_structure, check_pagination_structure
 
 
 class ListsTests(YamtrackApiTestCase):
@@ -19,7 +19,7 @@ class ListsTests(YamtrackApiTestCase):
         self.assertIn("results", payload)
         check_pagination_structure(self, payload["pagination"])
         for lst in payload["results"]:
-            check_minimized_lists_structure(self, lst)
+            check_complete_lists_structure(self, lst)
 
     def test_lists_get_search_filter_returns_filtered_results(self):
         """Lists endpoint should filter by search query."""

@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Yamtrack API
-  version: 0.0.24
+  version: 0.0.25
   description: Initial API for Yamtrack.
 servers:
   - url: http://localhost:8000
@@ -273,7 +273,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedLists"
+                $ref: "#/components/schemas/PaginatedListsNoItems"
         "400":
           description: Bad Request
           content:
@@ -4133,6 +4133,41 @@ components:
           #   type: string
           list_item_id:
             type: integer
+    ListsNoItems:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+          format: uri
+        owner:
+          type: object
+          properties:
+            id:
+              type: number
+              description: The id of the user of the owner
+            username:
+              type: string
+        collaborators:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: number
+                description: The id of the user of the collaborator
+              username:
+                type: string
+        items_count:
+          type: number
+        latest_update:
+          type: string
+          format: timestamp
     ListsSortOptions:
       type: string
       enum:
@@ -4364,7 +4399,16 @@ components:
         results:
           type: array
           items:
-            $ref: "#/components/schemas/ListsMinimized"
+            $ref: "#/components/schemas/Lists"
+    PaginatedListsNoItems:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListsNoItems"
     PaginatedMedia:
       type: object
       properties:

@@ -450,6 +450,9 @@ class EventSerializer(serializers.ModelSerializer):
         """Transform item to episode when content_number is present."""
         data = super().to_representation(instance)
 
+        if data.get("item") and instance.item is not None:
+            data["item"]["media_id"] = instance.item.media_id
+
         if instance.content_number is not None and data.get("item"):
             item_data = data["item"]
             item_data["episode_number"] = instance.content_number

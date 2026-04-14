@@ -49,6 +49,25 @@ def check_changes_history_record_structure(test_case, item):
         test_case.assertIn("new_value", change)
 
 
+def check_complete_lists_structure(test_case, item, *, include_items=False):
+    """Assert that the given item follows the complete lists structure."""
+    test_case.assertIn("id", item)
+    test_case.assertIn("name", item)
+    test_case.assertIn("description", item)
+    test_case.assertIn("image", item)
+    test_case.assertIn("owner", item)
+    test_case.assertIn("collaborators", item)
+    test_case.assertIn("items_count", item)
+    test_case.assertIn("latest_update", item)
+    if include_items:
+        test_case.assertIn("items", item)
+        test_case.assertIn("pagination", item["items"])
+        check_pagination_structure(test_case, item["items"]["pagination"])
+        test_case.assertIn("results", item["items"])
+        for list_item in item["items"]["results"]:
+            check_media_structure(test_case, list_item)
+
+
 def check_complete_media_structure(test_case, item):
     """Assert that the given item follows the complete media structure."""
     test_case.assertIn("id", item)
