@@ -498,7 +498,7 @@ def resolve_calendar_date_range(start_date, end_date, month_q, year_q):
         parsed_start = try_parse_date(start_date) if start_date else None
         parsed_end = try_parse_date(end_date) if end_date else None
 
-        first_day = parsed_start if parsed_start else date(1970, 1, 1)
+        first_day = parsed_start or date(1970, 1, 1)
         if parsed_end:
             return first_day, parsed_end
         if parsed_start:
