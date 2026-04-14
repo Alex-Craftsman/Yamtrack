@@ -326,8 +326,12 @@ class CompleteMediaSerializer(serializers.Serializer):
             "image": media_metadata.get("image"),
             "synopsis": media_metadata.get("synopsis"),
             "genres": media_metadata.get("genres"),
-            "score": float(media_metadata.get("score")) if media_metadata.get("score") is not None else None,
-            "score_count": int(media_metadata.get("score_count")) if media_metadata.get("score_count") is not None else None,
+            "score": float(media_metadata.get("score"))
+            if media_metadata.get("score") is not None
+            else None,
+            "score_count": int(media_metadata.get("score_count"))
+            if media_metadata.get("score_count") is not None
+            else None,
             "details": details,
             "related": related,
             "item_id": ItemIdField().to_representation(temp_media),

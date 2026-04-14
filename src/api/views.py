@@ -65,23 +65,23 @@ from .serializers import (
     serialize_data,
 )
 
-# TODO!: check sorters and filters in paginate_data since data is not serialized yet. Maybe data should be serialized first and then sorted/paginated later?? Sorting/filtering should occur at db search level, pagination should be done right after, always at the db search level, then the data should be serialized.
+# TODO!: check sorters and filters in paginate_data since data is not serialized yet. Maybe data should be serialized first and then sorted/paginated later?? Sorting/filtering should occur at db search level, pagination should be done right after, always at the db search level, then the data should be serialized.  # noqa: E501, W505
 
-# TODO!: for children items, it should return an error if user is trying to access a non existing season/episode (for example if it's requested the season 4 of a 2 season show)
+# TODO!: for children items, it should return an error if user is trying to access a non existing season/episode (for example if it's requested the season 4 of a 2 season show)  # noqa: E501, W505
 
-# TODO: Implement search for already tracked media (item_id and tracked fields)
+# TODO: Implement search for already tracked media (item_id and tracked fields)  # noqa: E501, FIX002, W505
 
-# TODO: Implement global search endpoint for every media_type
+# TODO: Implement global search endpoint for every media_type  # noqa: E501, FIX002, W505
 
-# TODO: Implement admin commands to manage users (add admins, remove/add users, etc)
+# TODO: Implement admin commands to manage users (add admins, remove/add users, etc)  # noqa: E501, FIX002, W505
 
-# TODO: Move operations on db to `models` file of the relative django app
+# TODO: Move operations on db to `models` file of the relative django app  # noqa: E501, FIX002, W505
 
-# TODO!!: since it's possible to add to lists untracked items, the id field can be null, so it's impossible to get these elements from the list, while it should be possible. The untracked added element is in the Items table, but not in the media tables. Add the list of lists an item is in to the model of the medias, so they can be retrieved and computed easily.
+# TODO!!: since it's possible to add to lists untracked items, the id field can be null, so it's impossible to get these elements from the list, while it should be possible. The untracked added element is in the Items table, but not in the media tables. Add the list of lists an item is in to the model of the medias, so they can be retrieved and computed easily.  # noqa: E501, FIX002, W505
 
-# TODO: look into django.core.paginator Paginator
+# TODO: look into django.core.paginator Paginator  # noqa: FIX002
 
-# TODO: Review children endpoints performance and avoid repeated list lookups per item.
+# TODO: Review children endpoints performance and avoid repeated list lookups per item.  # noqa: E501, FIX002, W505
 
 
 # /api/v1/calendar/
@@ -213,7 +213,7 @@ class HealthView(CheckMixin, drf_views.APIView):
     authentication_classes = []
     permission_classes = []
 
-    def get(self, request):
+    def get(self, request):  # noqa: ARG002
         # TODO: speed up data collection, right now request takes ~2s
         """Check API health status."""
         errors = self.errors
@@ -771,8 +771,8 @@ class MediaListView(drf_views.APIView):
             results.reverse()
 
         paginated_data = paginate_data(request, results, limit, offset)
-        # TODO: see if this can be optimized with a single query for all medias instead of one per episode
-        # TODO: see if lists infos can be saved in the `results` object to avoid using `context` to pass additional parameters
+        # TODO: see if this can be optimized with a single query for all medias instead of one per episode  # noqa: E501, W505
+        # TODO: see if lists infos can be saved in the `results` object to avoid using `context` to pass additional parameters  # noqa: E501, W505
         lists_by_item_id = build_lists_by_item_id(user, paginated_data["results"])
         serialized_data = serialize_data(
             paginated_data["results"],
@@ -839,8 +839,8 @@ class MediaTypeListView(drf_views.APIView):
             results.reverse()
 
         paginated_data = paginate_data(request, results, limit, offset)
-        # TODO: see if this can be optimized with a single query for all medias instead of one per episode
-        # TODO: see if lists infos can be saved in the `results` object to avoid using `context` to pass additional parameters
+        # TODO: see if this can be optimized with a single query for all medias instead of one per episode  # noqa: E501, W505
+        # TODO: see if lists infos can be saved in the `results` object to avoid using `context` to pass additional parameters  # noqa: E501, W505
         lists_by_item_id = build_lists_by_item_id(user, paginated_data["results"])
         serialized_data = serialize_data(
             paginated_data["results"],
@@ -2361,8 +2361,8 @@ class MediaSeasonEpisodesView(drf_views.APIView):
 
         paginated = paginate_data(request, episodes, limit, offset)
 
-        # TODO: see if this can be optimized with a single query for all episodes instead of one per episode
-        # TODO: see if lists infos can be saved in the `episodes` object to avoid using `context` to pass additional parameters
+        # TODO: see if this can be optimized with a single query for all episodes instead of one per episode  # noqa: E501, W505
+        # TODO: see if lists infos can be saved in the `episodes` object to avoid using `context` to pass additional parameters  # noqa: E501, W505
         lists_by_number = {}
         for episode in paginated["results"]:
             episode_number = episode.get("episode_number")
@@ -2482,7 +2482,7 @@ class MediaSeasonConsumptionHistoryView(drf_views.APIView):
         return Response(paginated_data, status=200)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/[consumption_id]/
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/[consumption_id]/  # noqa: E501, W505
 class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
     """Season consumption history entry detail view."""
 
@@ -2498,7 +2498,7 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
         season_number,
         consumption_id,
     ):
-        """Delete a specific consumption history entry for a specific season of a tv serie."""
+        """Delete a specific consumption history entry for a specific season."""
         if not check_valid_type(media_type):
             return Response(
                 {"detail": get_http_message(400) + " Unsupported media type."},
@@ -2553,7 +2553,7 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
         return Response(status=204)
 
     def get(self, request, media_type, source, media_id, season_number, consumption_id):
-        """Retrieve a specific consumption history entry for a specific season of a tv serie."""
+        """Retrieve a specific consumption history entry for a specific season."""
         if not check_valid_type(media_type):
             return Response(
                 {"detail": get_http_message(400) + " Unsupported media type."},
@@ -2614,7 +2614,7 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
         season_number,
         consumption_id,
     ):
-        """Update a specific consumption history entry for a specific season of a tv serie."""
+        """Update a specific consumption history entry for a specific season."""
         if not check_valid_type(media_type):
             return Response(
                 {"detail": get_http_message(400) + " Unsupported media type."},
@@ -3343,7 +3343,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
         return Response(serialized, status=200)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/changes_history/
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/changes_history/  # noqa: E501, W505
 class MediaEpisodeChangesHistoryView(drf_views.APIView):
     """Changes history episode view."""
 
@@ -3414,7 +3414,7 @@ class MediaEpisodeChangesHistoryView(drf_views.APIView):
         return Response(paginated_data, status=200)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/  # noqa: E501, W505
 class MediaEpisodeConsumptionHistoryView(drf_views.APIView):
     """Episode consumption history view."""
 
@@ -3482,7 +3482,7 @@ class MediaEpisodeConsumptionHistoryView(drf_views.APIView):
         return Response(paginated_data, status=200)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/[consumption_id]/
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/[consumption_id]/  # noqa: E501, W505
 class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
     """Episode consumption history entry detail view."""
 
@@ -3750,7 +3750,7 @@ class MediaEpisodeListsView(drf_views.APIView):
         return Response(paginated_data, status=200)
 
 
-# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/lists/[list_id]/
+# /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/lists/[list_id]/  # noqa: E501, W505
 class MediaEpisodeListDetailView(drf_views.APIView):
     """Episode list detail view."""
 
