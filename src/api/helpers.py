@@ -726,4 +726,10 @@ def apply_list_sort(queryset, sort, sort_order):
             ),
         ).order_by(ordering, "name")
 
+    if sort == "items":
+        items_ordering = "-items_count" if sort_order == "desc" else "items_count"
+        return queryset.annotate(
+            items_count=Count("items", distinct=True),
+        ).order_by(items_ordering, "name")
+
     return queryset.order_by(ordering)
