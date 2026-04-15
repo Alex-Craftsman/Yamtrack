@@ -60,14 +60,11 @@ class ItemSerializer(serializers.ModelSerializer):
     media_id = serializers.SerializerMethodField()
 
     def get_media_id(self, obj):
-        """Return numeric media_id when the stored value is numeric."""
+        """Return media_id preserving alphanumeric provider IDs."""
         media_id = getattr(obj, "media_id", None)
         if media_id is None:
             return None
-        try:
-            return int(media_id)
-        except (TypeError, ValueError):
-            return media_id
+        return str(media_id)
 
     class Meta:  # noqa: D106
         model = Item
@@ -156,7 +153,11 @@ class CompleteEpisodeSerializer(serializers.Serializer):
 
         return {
             "id": user_medias[0].item_id if user_medias else None,
-            "media_id": int(media_metadata.get("media_id")),
+            "media_id": (
+                str(media_metadata.get("media_id"))
+                if media_metadata.get("media_id") is not None
+                else None
+            ),
             "source": media_metadata.get("source"),
             "source_url": source_url,
             "media_type": media_type,
@@ -314,7 +315,11 @@ class CompleteMediaSerializer(serializers.Serializer):
 
         return {
             "id": user_medias[0].item_id if user_medias else None,
-            "media_id": int(media_metadata.get("media_id")),
+            "media_id": (
+                str(media_metadata.get("media_id"))
+                if media_metadata.get("media_id") is not None
+                else None
+            ),
             "source": media_metadata.get("source"),
             "source_url": media_metadata.get("source_url"),
             "media_type": media_metadata.get("media_type"),

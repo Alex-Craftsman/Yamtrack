@@ -3,7 +3,7 @@ from calendar import monthrange
 from datetime import date
 from urllib.parse import urlencode
 
-from django.db.models import OuterRef, Subquery
+from django.db.models import Count, OuterRef, Subquery
 from django.utils.dateparse import parse_date
 from django.utils.timezone import localdate
 from rest_framework.response import Response
@@ -616,12 +616,9 @@ def itemid_key_compare(media):
     item = getattr(media, "item", media)
     media_type = getattr(item, "media_type", "")
     source = getattr(item, "source", "")
-    media_id_raw = getattr(item, "media_id", 0)
-    try:
-        media_id_num = int(str(media_id_raw))
-    except (TypeError, ValueError):
-        media_id_num = 0
-    return (media_type, source, media_id_num)
+    media_id_raw = getattr(item, "media_id", "")
+    media_id_key = str(media_id_raw).lower() if media_id_raw is not None else ""
+    return (media_type, source, media_id_key)
 
 
 def _item_from_result(media):

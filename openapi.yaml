@@ -888,7 +888,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "204":
           description: No Content
@@ -935,7 +935,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: OK
@@ -986,7 +986,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         required: true
         content:
@@ -1048,7 +1048,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: query
           name: limit
           schema:
@@ -1114,7 +1114,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: query
           name: limit
           schema:
@@ -1180,7 +1180,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: consumption_id
           required: true
@@ -1233,7 +1233,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: consumption_id
           required: true
@@ -1290,7 +1290,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: consumption_id
           required: true
@@ -1360,7 +1360,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: query
           name: offset
           schema:
@@ -1424,7 +1424,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: list_id
           required: true
@@ -1476,7 +1476,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: list_id
           required: true
@@ -1535,7 +1535,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: OK
@@ -1587,7 +1587,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: query
           name: limit
           schema:
@@ -1653,7 +1653,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "202":
           description: Sync triggered
@@ -1711,7 +1711,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -1763,7 +1763,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -1819,7 +1819,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -1879,7 +1879,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -1949,7 +1949,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2021,7 +2021,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2094,7 +2094,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2152,7 +2152,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2214,7 +2214,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2282,7 +2282,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2351,7 +2351,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2408,7 +2408,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2472,7 +2472,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2531,7 +2531,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2588,7 +2588,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2649,7 +2649,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2714,7 +2714,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2790,7 +2790,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2868,7 +2868,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2931,7 +2931,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -2998,7 +2998,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -3071,7 +3071,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -3145,7 +3145,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -3207,7 +3207,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -3276,7 +3276,7 @@ paths:
           name: media_id
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: season_number
           required: true
@@ -3636,7 +3636,7 @@ components:
           type: integer
           description: The id of the item in the database (not to be confused with the item_id, which is media provider specific)
         media_id:
-          type: integer
+          type: string
         source:
           type: string
         source_url:
@@ -4065,7 +4065,7 @@ components:
       type: object
       properties:
         media_id:
-          type: integer
+          type: string
         source:
           $ref: "#/components/schemas/Source"
         media_type:
@@ -4468,7 +4468,7 @@ components:
             type: string
             format: uri
           media_id:
-            type: integer
+            type: string
           title:
             type: string
     SearchItem:
@@ -4476,7 +4476,7 @@ components:
       type: object
       properties:
         media_id:
-          type: integer
+          type: string
         source:
           $ref: "#/components/schemas/Source"
         media_type:
@@ -4501,7 +4501,7 @@ components:
           format: uri
           nullable: true
         media_id:
-          type: integer
+          type: string
         title:
           type: string
         season_number:

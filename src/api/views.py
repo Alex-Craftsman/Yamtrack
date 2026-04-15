@@ -1,9 +1,11 @@
+import asyncio
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import IntegrityError
 from django.utils.timezone import datetime, localdate, make_aware
-from health_check.mixins import CheckMixin
+from health_check.views import HealthCheckView
 from rest_framework import permissions
 from rest_framework import views as drf_views
 from rest_framework.response import Response
@@ -207,17 +209,36 @@ class MediaTypeChangesHistoryDetailView(drf_views.APIView):
 
 
 # /api/v1/health/
-class HealthView(CheckMixin, drf_views.APIView):
+class HealthView(drf_views.APIView):
     """Health check view."""
 
     authentication_classes = []
     permission_classes = []
 
+    checks = HealthCheckView.checks
+
+    def get_checks(self):
+        """Return instantiated health checks using the installed library."""
+        helper_view = HealthCheckView()
+        helper_view.checks = self.checks
+        return list(helper_view.get_checks())
+
+    async def _collect_health_results(self):
+        """Run all health checks and return their results."""
+        return await asyncio.gather(
+            *(check.get_result() for check in self.get_checks())
+        )
+
     def get(self, request):  # noqa: ARG002
-        # TODO: speed up data collection, right now request takes ~2s
         """Check API health status."""
-        errors = self.errors
-        plugins = self.plugins
+        # TODO: speed up data collection, right now request takes ~2s
+        results = asyncio.run(self._collect_health_results())
+        errors = [result.error for result in results if result.error]
+        plugins = {}
+        for result in results:
+            plugin = result.check
+            plugin.errors = [result.error] if result.error else []
+            plugins[repr(plugin)] = plugin
         health_data = {
             "plugins": plugins,
             "errors": errors,

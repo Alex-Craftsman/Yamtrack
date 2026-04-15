@@ -133,7 +133,7 @@ class MediaEpisodeTests(YamtrackApiTestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["media_id"], int(tv_item.media_id))
+        self.assertEqual(payload["media_id"], tv_item.media_id)
         self.assertEqual(payload["source"], tv_item.source)
         self.assertIn("consumptions", payload)
         self.assertIn("lists", payload)

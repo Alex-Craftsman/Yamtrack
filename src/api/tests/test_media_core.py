@@ -269,7 +269,7 @@ class MediaCoreTests(YamtrackApiTestCase):
         payload = response.json()
 
         check_media_structure(self, payload)
-        self.assertEqual(payload["item"]["media_id"], 1)
+        self.assertEqual(payload["item"]["media_id"], "1")
         self.assertEqual(payload["item"]["source"], "manual")
         self.assertEqual(payload["item"]["media_type"], MediaTypes.MOVIE.value)
 
