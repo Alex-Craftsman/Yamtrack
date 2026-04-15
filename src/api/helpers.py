@@ -673,6 +673,7 @@ def apply_manual_sort_for_type(results, sort):
             {"detail": get_http_message(400) + " Invalid sorting"},
             status=400,
         )
+    results.sort(key=_AGGREGATED_MANUAL_SORT_KEYS[sort])
     return results
 
 
