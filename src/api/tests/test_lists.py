@@ -49,6 +49,27 @@ class ListsTests(YamtrackApiTestCase):
         names = [item["name"] for item in payload["results"]]
         self.assertEqual(names, sorted(names, reverse=True))
 
+    def test_lists_get_items_sort_uses_item_count(self):
+        """Lists endpoint should sort by number of items, not by join order."""
+        response = self.call_api(
+            "get",
+            "api_lists",
+            params={"sort": "items_desc"},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        names = [item["name"] for item in payload["results"]]
+        self.assertEqual(
+            names,
+            ["Favorites", "Shared Picks", "Watching Now"],
+        )
+        self.assertEqual(
+            [item["items_count"] for item in payload["results"]],
+            [3, 3, 2],
+        )
+
     def test_lists_post_without_name_returns_bad_request(self):
         """Creating a list without name must fail with 400."""
         response = self.call_api(

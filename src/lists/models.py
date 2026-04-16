@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.db import models, transaction
-from django.db.models import F, Max, Prefetch, Q
+from django.db.models import Count, F, Max, OuterRef, Prefetch, Q, Subquery
 
 from app.models import Item
 
@@ -31,6 +31,19 @@ class CustomListManager(models.Manager):
                 ),
             )
             .distinct()
+        )
+
+    def get_user_lists_with_stats(self, user, search=""):
+        """Return user lists annotated with items_count and latest_update."""
+        return self.get_user_lists(user, search=search).annotate(
+            items_count=Count("items", distinct=True),
+            latest_update=Subquery(
+                CustomListItem.objects.filter(
+                    custom_list=OuterRef("pk"),
+                )
+                .order_by("-date_added")
+                .values("date_added")[:1],
+            ),
         )
 
     def get_user_lists_with_item(self, user, item):

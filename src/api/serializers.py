@@ -580,7 +580,14 @@ class ListSerializer(serializers.Serializer):
 
     def to_representation(self, instance):
         """Serialize a CustomList."""
-        item_count = instance.items.count()
+        item_count = getattr(instance, "items_count", None)
+        if item_count is None:
+            item_count = instance.items.count()
+
+        latest_update = getattr(instance, "latest_update", None)
+        if latest_update is None:
+            latest_update = CustomListItem.objects.get_last_added_date(instance)
+
         include_items = True
         if self.context and "include_items" in self.context:
             include_items = self.context["include_items"]
@@ -621,7 +628,7 @@ class ListSerializer(serializers.Serializer):
                 for collaborator in instance.collaborators.all()
             ],
             "items_count": item_count,
-            "latest_update": CustomListItem.objects.get_last_added_date(instance),
+            "latest_update": latest_update,
         }
 
         if include_items:
