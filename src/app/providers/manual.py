@@ -177,6 +177,8 @@ def build_episodes_response(season_episodes):
 
 def search(media_type, query, page=1, *, limit=None, offset=None, user=None):
     """Search tracked manual media for the authenticated user."""
+    normalized_query = (query or "").strip()
+
     if user is None or media_type not in MODEL_MAP:
         per_page = limit or settings.PER_PAGE
         current_page = (
@@ -184,14 +186,17 @@ def search(media_type, query, page=1, *, limit=None, offset=None, user=None):
         )
         return helpers.format_search_response(current_page, per_page, 0, [])
 
-    cache_key = f"manual_search:{media_type}_{query}_{user.id}_{page}"
-    data = cache.get(cache_key)
-    if data is not None:
-        return data
-
     per_page = limit or settings.PER_PAGE
     current_offset = offset if offset is not None else (page - 1) * per_page
     current_page = current_offset // per_page + 1
+
+    cache_key = (
+        "manual_search_"
+        f"{media_type}_{normalized_query.lower()}_{user.id}_{current_page}"
+    )
+    data = cache.get(cache_key)
+    if data is not None:
+        return data
 
     model_class = MODEL_MAP[media_type]
     tracked_item_ids = model_class.objects.filter(user=user).values_list(
@@ -203,7 +208,7 @@ def search(media_type, query, page=1, *, limit=None, offset=None, user=None):
         id__in=tracked_item_ids,
         source=Sources.MANUAL.value,
         media_type=media_type,
-        title__icontains=query,
+        title__icontains=normalized_query,
     ).order_by("title", "id")
 
     total_results = item_queryset.count()
