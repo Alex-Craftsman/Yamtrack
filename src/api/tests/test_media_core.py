@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from uuid import UUID
 
 from app.models import MediaTypes, Sources, Status
 
@@ -269,7 +270,8 @@ class MediaCoreTests(YamtrackApiTestCase):
         payload = response.json()
 
         check_media_structure(self, payload)
-        self.assertEqual(payload["item"]["media_id"], "1")
+        manual_media_id = payload["item"]["media_id"]
+        self.assertEqual(str(UUID(manual_media_id)), manual_media_id)
         self.assertEqual(payload["item"]["source"], "manual")
         self.assertEqual(payload["item"]["media_type"], MediaTypes.MOVIE.value)
 
