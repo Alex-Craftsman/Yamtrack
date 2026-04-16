@@ -28,6 +28,7 @@ def metadata(media_id, media_type):
     }
 
     if media_type in {MediaTypes.TV.value, MediaTypes.SEASON.value}:
+        num_episodes = 0
         season_items = get_season_items(media_id)
         if season_items.count() > 0:
             response["details"]["seasons"] = season_items.count()
