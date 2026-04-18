@@ -77,7 +77,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          coverage run src/manage.py test app users integrations lists events --parallel
+          coverage run src/manage.py test api app users integrations lists events --parallel
 
       - name: Build Coverage Report
         run: |

@@ -25,6 +25,7 @@ def lists(request):
     page = request.GET.get("page", 1)
     sort_by = request.user.update_preference("lists_sort", request.GET.get("sort"))
 
+    # TODO: use new integrated search in get_user_lists
     custom_lists = CustomList.objects.get_user_lists(request.user)
 
     if search_query:
@@ -304,12 +305,17 @@ def list_item_toggle(request):
         ).distinct(),  # To prevent duplicates, when user is owner and collaborator
     )
 
-    if custom_list.items.filter(id=item.id).exists():
-        custom_list.items.remove(item)
+    custom_list_item = CustomListItem.objects.filter(
+        custom_list=custom_list,
+        item=item,
+    ).first()
+
+    if custom_list_item is not None:
+        custom_list_item.delete()
         logger.info("%s removed from %s.", item, custom_list)
         has_item = False
     else:
-        custom_list.items.add(item)
+        CustomListItem.objects.create(custom_list=custom_list, item=item)
         logger.info("%s added to %s.", item, custom_list)
         has_item = True
 

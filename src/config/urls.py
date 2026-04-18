@@ -42,6 +42,7 @@ urlpatterns = [
             )
         ),
     ),
+    path("api/v1/", include("api.urls")),
 ]
 
 # Build the accounts URLs

@@ -1,0 +1,4986 @@
+openapi: 3.0.4
+info:
+  title: Yamtrack API
+  version: 0.0.25
+  description: Initial API for Yamtrack.
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+security:
+  - ApiKeyAuth: []
+  - bearerAuth: []
+tags:
+  - name: calendar
+  - name: changes_history
+  - name: health
+  - name: history
+  - name: info
+  - name: lists
+  - name: media
+  - name: search
+  - name: statistics
+paths:
+  /api/v1/calendar/:
+    get:
+      tags:
+        - calendar
+      summary: List upcoming events of tracked media
+      parameters:
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+          description: The start date to retrieve events for (YYYY-MM-DD)
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+          description: The end date to retrieve events for. If omitted with start_date, defaults to the end of that month; otherwise defaults to the end of the selected/current month (YYYY-MM-DD)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: month
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: The month to retrieve events for (1-12). Used only if start_date is not set. Default is current month
+        - in: query
+          name: year
+          schema:
+            type: integer
+          description: The year to retrieve events for. Used only if start_date is not set. Default is current year
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedCalendar"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/calendar/update/:
+    post:
+      tags:
+        - calendar
+      summary: Update calendar events
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/changes_history/{media_type}/{history_id}/:
+    delete:
+      tags:
+        - changes_history
+      summary: Delete a specific changes history record by media type and history id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: history_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - changes_history
+      summary: Retrieve a specific changes history record by media type and history id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypesComplete"
+        - in: path
+          name: history_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangesHistoryRecord"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/health/:
+    get:
+      tags:
+        - health
+      summary: Health check endpoint
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/v1/info/:
+    get:
+      tags:
+        - info
+      summary: Get application information
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfoResponse"
+  /api/v1/lists/:
+    get:
+      tags:
+        - lists
+      summary: List the user's custom lists
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Case-insensitive substring search on list name or description
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/ListsSortOptions"
+          description: Sort order for results
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedListsNoItems"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - lists
+      summary: Create a new list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateList"
+            examples:
+              basic:
+                summary: Basic list creation
+                value:
+                  name: "My Favorite Movies"
+                  description: "A list of my all-time favorite movies."
+              detailed:
+                summary: Detailed list creation
+                value:
+                  name: "Sci-Fi Collection"
+                  description: "A curated list of the best science fiction films."
+                  collaborators: [2, 5]
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteList"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/lists/{list_id}/:
+    delete:
+      tags:
+        - lists
+      summary: Delete a list
+      parameters:
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - lists
+      summary: Get list details
+      parameters:
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Case-insensitive substring search on item titles
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/SortOptions"
+          description: Sort order for results
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteList"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - lists
+      summary: Edit a list
+      parameters:
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditList"
+            examples:
+              basic:
+                summary: Basic list editing
+                value:
+                  name: "My Favorite Movies"
+                  description: "A list of my all-time favorite movies."
+              detailed:
+                summary: Detailed list editing
+                value:
+                  name: "Sci-Fi Collection"
+                  description: "A curated list of the best science fiction films."
+                  collaborators: [2, 5]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteList"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/lists/{list_id}/items/:
+    get:
+      tags:
+        - lists
+      summary: List list items
+      parameters:
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/lists/{list_id}/items/{item_id}/:
+    delete:
+      tags:
+        - lists
+      summary: Remove an item from a list
+      parameters:
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: item_id
+          description: Sequential item identifier scoped to the list (starts from 0).
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - lists
+      summary: Get an Item from a list
+      parameters:
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: item_id
+          description: Sequential item identifier scoped to the list (starts from 0).
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/:
+    get:
+      tags:
+        - media
+      summary: List tracked media for the authenticated user
+      parameters:
+        - in: query
+          name: exclude
+          schema:
+            type: string
+          description: Comma-separated list of media types to exclude (excluded by default are seasons and episodes)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Case-insensitive substring search on item title
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/SortOptions"
+          description: Sort order for results
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/MediaStatus"
+          description: Filter by media status
+        - in: query
+          name: media_type
+          schema:
+            $ref: "#/components/schemas/MediaTypesComplete"
+          description: Filter by media type
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/:
+    get:
+      tags:
+        - media
+      summary: List tracked media of a given media type for the authenticated user
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypesComplete"
+          description: Filter by media type
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Case-insensitive substring search on item title
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/SortOptions"
+          description: Sort order for results
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/MediaStatus"
+          description: Filter by media status
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - media
+      summary: Create a media item of a given media type
+      description: |
+        Create a new tracked media item. 
+        For manual creations set `source` to `manual` and omit `media_id`.
+        For provider creations set `source` to the provider name (eg. `tmdb`) and
+        provide `media_id`. Provider metadata (title/image) will overwrite any
+        existing values when creating or updating the Item.
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypesComplete"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMedia"
+            examples:
+              manual:
+                summary: Manual creation (custom item)
+                value:
+                  source: "manual"
+                  title: "My Custom Movie"
+                  image: "https://example.com/poster.jpg"
+                  score: 8.5
+                  status: 3
+                  progress: 1
+                  start_date: "2023-10-01T00:00:00Z"
+                  end_date: "2023-10-01T00:00:00Z"
+                  notes: "Watched at the festival"
+              provider:
+                summary: Provider-based creation (fetch metadata)
+                value:
+                  source: "tmdb"
+                  media_id: "12345"
+                  season_number: 1
+                  score: 9
+                  status: 1
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/:
+    delete:
+      tags:
+        - media
+      summary: Delete a media item and all its consumptions if it's tracked
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - media
+      summary: Retrieve a media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - media
+      summary: Edit LAST CONSUMPTION of a media item if it's tracked
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/UpdateAnime"
+                - $ref: "#/components/schemas/UpdateBook"
+                - $ref: "#/components/schemas/UpdateComic"
+                - $ref: "#/components/schemas/UpdateGame"
+                - $ref: "#/components/schemas/UpdateManga"
+                - $ref: "#/components/schemas/UpdateMovie"
+                - $ref: "#/components/schemas/UpdateTV"
+      responses:
+        "200":
+          description: Updated
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/changes_history/:
+    get:
+      tags:
+        - media
+        - changes_history
+      summary: Get changes history records for a media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedChangesHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/history/:
+    get:
+      tags:
+        - media
+        - history
+      summary: Get watch history records for a media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedConsumptionHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/history/{consumption_id}/:
+    delete:
+      tags:
+        - history
+        - media
+      summary: Delete a specific watch history record by media type, source, media id and watch id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - history
+        - media
+      summary: Retrieve a specific watch history record by media type, source, media id and watch id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - history
+        - media
+      summary: Edit a specific consumption history record of a tracked media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/UpdateAnime"
+                - $ref: "#/components/schemas/UpdateBook"
+                - $ref: "#/components/schemas/UpdateComic"
+                - $ref: "#/components/schemas/UpdateGame"
+                - $ref: "#/components/schemas/UpdateManga"
+                - $ref: "#/components/schemas/UpdateMovie"
+                - $ref: "#/components/schemas/UpdateTV"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/lists/:
+    get:
+      tags:
+        - lists
+      summary: List lists that the item belongs to
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/SortOptions"
+          description: Sort order for results
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedLists"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/lists/{list_id}/:
+    delete:
+      tags:
+        - lists
+      summary: Remove the item from a specific list by list id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags:
+        - lists
+      summary: Remove the item from a specific list by list id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ListsMinimized"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/recommendations/:
+    get:
+      tags:
+        - media
+      summary: Retrieve related medias of a tracked media item by media type, source and media id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RelatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/seasons/:
+    get:
+      tags:
+        - media
+      summary: Retrieve tracked seasons for a TV media item by media type, source and media id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/sync/:
+    post:
+      tags:
+        - media
+      summary: Sync metadata from provider (non-manual sources)
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Sync triggered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/:
+    delete:
+      tags:
+        - media
+      summary: Delete a tracked season and all of its consumptions
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - media
+      summary: Retrieve a tracked season
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - media
+      summary: Edit LAST CONSUMPTION of a tracked season
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSeason"
+      responses:
+        "200":
+          description: Updated
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/changes_history/:
+    get:
+      tags:
+        - media
+        - changes_history
+      summary: Get changes history records for a season
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedChangesHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/episodes/:
+    get:
+      tags:
+        - media
+      summary: Retrieve tracked episodes for a season item by media type, source, media id and season number
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/history/:
+    get:
+      tags:
+        - media
+        - history
+      summary: Get watch history records for a season
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/history/{consumption_id}/:
+    delete:
+      tags:
+        - history
+        - media
+      summary: Delete a specific watch history record by media type, source, media id, season number and watch id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - history
+        - media
+      summary: Retrieve a specific watch history record by media type, source, media id, season number and watch id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - history
+        - media
+      summary: Edit a specific consumption history record of a tracked season
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSeason"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/lists/:
+    get:
+      tags:
+        - lists
+      summary: List lists that the season item belongs to
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/SortOptions"
+          description: Sort order for results
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedLists"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/lists/{list_id}/:
+    delete:
+      tags:
+        - lists
+      summary: Remove the season item from a specific list by list id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags:
+        - lists
+      summary: Add the season item to a specific list by list id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ListsMinimized"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/sync/:
+    post:
+      tags:
+        - media
+      summary: Sync season metadata from provider (non-manual sources)
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "202":
+          description: Sync triggered
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/:
+    delete:
+      tags:
+        - media
+      summary: Delete a tracked media item
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - media
+      summary: Retrieve a tracked episode item by media type, source, media id, season number and episode number
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteMedia"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - media
+      summary: Edit LAST CONSUMPTION of a tracked episode
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEpisode"
+      responses:
+        "200":
+          description: Updated
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/changes_history/:
+    get:
+      tags:
+        - media
+        - changes_history
+      summary: Get changes history records for an episode
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedChangesHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/history/:
+    get:
+      tags:
+        - media
+        - history
+      summary: Get watch history records for an episode
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+          description: Maximum number of results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Starting index for pagination
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/history/{consumption_id}/:
+    delete:
+      tags:
+        - history
+        - media
+      summary: Delete a specific consumption history record
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - history
+        - media
+      summary: Retrieve a specific consumption history record
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags:
+        - history
+        - media
+      summary: Edit a specific consumption history record of a tracked episode
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: consumption_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEpisode"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumptionInfos"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/lists/:
+    get:
+      tags:
+        - lists
+      summary: List lists that the episode item belongs to
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+        - in: query
+          name: sort
+          schema:
+            $ref: "#/components/schemas/SortOptions"
+          description: Sort order for results
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedLists"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/lists/{list_id}:
+    delete:
+      tags:
+        - lists
+      summary: Remove the episode item from a specific list by list id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags:
+        - lists
+      summary: Add the episode item to a specific list by list id
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: list_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ListsMinimized"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/media/{media_type}/{source}/{media_id}/{season_number}/{episode_number}/sync/:
+    post:
+      tags:
+        - media
+      summary: Sync season metadata from provider (non-manual sources). Redirects to the parent season sync.
+      parameters:
+        - in: path
+          name: media_type
+          required: true
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+        - in: path
+          name: source
+          required: true
+          schema:
+            $ref: "#/components/schemas/Source"
+        - in: path
+          name: media_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: season_number
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: episode_number
+          required: true
+          schema:
+            type: integer
+      responses:
+        "202":
+          description: Sync triggered
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/search/{media_type}/:
+    get:
+      tags:
+        - search
+      summary: Search for media items across supported providers
+      parameters:
+        - in: path
+          name: media_type
+          schema:
+            $ref: "#/components/schemas/MediaTypes"
+          description: Media type to search for
+          required: true
+        - in: query
+          name: search
+          required: true
+          schema:
+            type: string
+          description: Search query string
+        - in: query
+          name: source
+          schema:
+            $ref: "#/components/schemas/Source"
+          description: The specific source of the media type to query
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+          description: "Maximum number of items to return (default: 20)"
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: "Offset for pagination (default: 0)"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedSearch"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/statistics/:
+    get:
+      tags:
+        - statistics
+      summary: Get statistics for the authenticated user
+      parameters:
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+          description: Filter media ended before this date (YYYY-MM-DD)
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+          description: Filter media started after this date (YYYY-MM-DD)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatisticsResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    AnimeDetails:
+      # TODO: missing fields
+      type: object
+      nullable: true
+    AnimeRelated:
+      # TODO: missing fields
+      type: object
+      nullable: true
+    BasicResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: The detail message of the response
+    BoardGameDetails:
+      type: object
+      properties:
+        year:
+          type: integer
+        players:
+          type: array
+          items:
+            type: integer
+        playtime:
+          type: integer
+        min_age:
+          type: integer
+        designers:
+          type: array
+          items:
+            type: string
+        publishers:
+          type: array
+          items:
+            type: string
+    BoardGameRelated:
+      type: object
+      nullable: true
+    BookDetails:
+      type: object
+      properties:
+        format:
+          type: string
+        number_of_pages:
+          type: integer
+        publish_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        author:
+          type: string
+        publisher:
+          type: string
+        isbn:
+          type: string
+    BookRelated:
+      type: object
+      nullable: true
+    CalendarEvent:
+      type: object
+      description: The calendar event
+      properties:
+        id:
+          type: integer
+        item:
+          $ref: "#/components/schemas/Item"
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
+        content_number:
+          type: integer
+        datetime:
+          type: string
+          format: date-time
+        notification_sent:
+          type: boolean
+    ChangesHistoryRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The changes history change id
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+          description: The id of the media item
+        timestamp:
+          type: string
+          format: date-time
+        changes:
+          type: array
+          description: List of changes done at specified timestamp
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: The media field changed
+                enum:
+                  - end_date
+                  - notes
+                  - progress
+                  - score
+                  - start_date
+                  - status
+              old_value:
+                type: string
+                description: The value before the change
+                nullable: true
+              new_value:
+                type: string
+                description: The value after the change
+                nullable: true
+    ComicDetails:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: year
+        publisher:
+          type: string
+        issues_count:
+          type: integer
+        last_issue_name:
+          type: string
+        last_issue_number:
+          type: integer
+        people:
+          type: array
+          items:
+            type: string
+        last_updated:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        last_issue_id:
+          type: integer
+    ComicRelated:
+      type: object
+      nullable: true
+      properties:
+        from_the_same_publisher:
+          type: array
+          items:
+            type: object
+            properties:
+              media_id:
+                type: string
+              source:
+                type: string
+              media_type:
+                type: string
+              title:
+                type: string
+              image:
+                type: string
+                format: uri
+    CompleteList:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+          format: uri
+        owner:
+          type: object
+          properties:
+            id:
+              type: number
+              description: The id of the user of the owner
+            username:
+              type: string
+        collaborators:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: number
+                description: The id of the user of the collaborator
+              username:
+                type: string
+        items_count:
+          type: number
+        latest_update:
+          type: string
+          format: timestamp
+        items:
+          $ref: "#/components/schemas/PaginatedMedia"
+    CompleteMedia:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The id of the item in the database (not to be confused with the item_id, which is media provider specific)
+        media_id:
+          type: string
+        source:
+          type: string
+        source_url:
+          type: string
+          format: uri
+        media_type:
+          $ref: "#/components/schemas/MediaTypesComplete"
+        title:
+          type: string
+        max_progress:
+          type: integer
+        image:
+          type: string
+          format: uri
+        synopsis:
+          type: string
+        genres:
+          type: array
+          items:
+            type: string
+        score:
+          type: number
+          format: float
+        score_count:
+          type: integer
+        details:
+          oneOf:
+            - $ref: "#/components/schemas/AnimeDetails"
+            - $ref: "#/components/schemas/BoardGameDetails"
+            - $ref: "#/components/schemas/BookDetails"
+            - $ref: "#/components/schemas/ComicDetails"
+            - $ref: "#/components/schemas/EpisodeDetails"
+            - $ref: "#/components/schemas/GameDetails"
+            - $ref: "#/components/schemas/MangaDetails"
+            - $ref: "#/components/schemas/MovieDetails"
+            - $ref: "#/components/schemas/SeasonDetails"
+            - $ref: "#/components/schemas/TVDetails"
+        related:
+          oneOf:
+            - $ref: "#/components/schemas/AnimeRelated"
+            - $ref: "#/components/schemas/BoardGameRelated"
+            - $ref: "#/components/schemas/BookRelated"
+            - $ref: "#/components/schemas/ComicRelated"
+            - $ref: "#/components/schemas/EpisodeRelated"
+            - $ref: "#/components/schemas/GameRelated"
+            - $ref: "#/components/schemas/MangaRelated"
+            - $ref: "#/components/schemas/MovieRelated"
+            - $ref: "#/components/schemas/SeasonRelated"
+            - $ref: "#/components/schemas/TVRelated"
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
+          description: If the Item is a Season or an Episode, the parent_id is the id of the Serie or of the Season
+        tracked:
+          type: boolean
+          description: If the current media is being tracked by Yamtrack
+        consumptions_number:
+          type: integer
+          description: Number of times the media has been watched/tracked
+        consumptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsumptionInfos"
+        lists:
+          $ref: "#/components/schemas/ListsMinimized"
+    ConsumptionInfos:
+      type: object
+      properties:
+        consumption_id:
+          type: integer
+          description: The id of the media consumption (id numbers are global for all consumptions of all medias of the same type, not sequential per media)
+        created:
+          type: string
+          format: date-time
+          nullable: true
+        score:
+          type: number
+          format: float
+          nullable: true
+        progress:
+          type: integer
+          nullable: true
+        progressed_at:
+          type: string
+          format: timestamp
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    CreateList:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        collaborators:
+          type: array
+          items:
+            type: number
+          description: List of username ids allowed to collaborate on this list
+          nullable: true
+    CreateMedia:
+      description: |
+        Unified payload for creating media items. Use `source: manual` for manual items (omit `media_id`) or
+        set a provider `source` and `media_id` to create from a provider.
+        When using a media provider, all media data will be overwritten.
+      type: object
+      properties:
+        source:
+          $ref: "#/components/schemas/Source"
+          description: "Provider source or 'manual'"
+        media_id:
+          type: string
+          nullable: true
+          description: "Provider media identifier (required for provider sources)"
+        title:
+          type: string
+        image:
+          type: string
+          nullable: true
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        repeats:
+          type: integer
+          nullable: true
+        season_number:
+          type: integer
+          nullable: true
+        episode_number:
+          type: integer
+          nullable: true
+    CrewMember:
+      type: object
+      properties:
+        job:
+          type: string
+        department:
+          type: string
+        credit_id:
+          type: string
+        adult:
+          type: boolean
+        gender:
+          type: integer
+        id:
+          type: integer
+        known_for_department:
+          type: string
+        name:
+          type: string
+        original_name:
+          type: string
+        popularity:
+          type: number
+          format: float
+        profile_path:
+          type: string
+    EditList:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        collaborators:
+          type: array
+          items:
+            type: number
+          description: List of username ids allowed to collaborate on this list
+          nullable: true
+    Episode:
+      type: object
+      properties:
+        air_date:
+          type: string
+          format: date
+        episode_number:
+          type: integer
+        episode_type:
+          type: string
+        id:
+          type: integer
+        name:
+          type: string
+        overview:
+          type: string
+        production_code:
+          type: string
+        runtime:
+          type: integer
+        season_number:
+          type: integer
+        show_id:
+          type: integer
+        still_path:
+          type: string
+          nullable: true
+        vote_average:
+          type: number
+          format: float
+        vote_count:
+          type: integer
+        crew:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrewMember"
+        guest_stars:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuestStar"
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
+    EpisodeDetails:
+      type: object
+      properties:
+        air_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+          nullable: true
+        episode_number:
+          type: integer
+        season_number:
+          type: integer
+        runtime:
+          type: integer
+          nullable: true
+        episode_type:
+          type: string
+        crew:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrewMember"
+        guest_stars:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuestStar"
+    EpisodeRelated:
+      type: object
+      nullable: true
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        errors:
+          type: object
+          nullable: true
+          description: Object of errors regarding body fields
+    GameDetails:
+      type: object
+      properties:
+        format:
+          type: string
+          description: If it's a game, an expansion...
+          enum:
+            - "Main game"
+            - "DLC"
+            - "Expansion"
+            - "Bundle"
+            - "Standalone expansion"
+            - "Mod"
+            - "Episode"
+            - "Season"
+            - "Remake"
+            - "Remaster"
+            - "Expanded game"
+            - "Port"
+            - "Fork"
+            - "Pack"
+            - "Update"
+        release_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        themes:
+          type: string
+          nullable: true
+        platforms:
+          type: array
+          items:
+            type: string
+    GameRelated:
+      type: object
+      properties:
+        parent_game:
+          type: array
+          items:
+            type: string
+        remasters:
+          type: array
+          items:
+            type: string
+        remakes:
+          type: array
+          items:
+            type: string
+        expansions:
+          type: array
+          items:
+            type: string
+        standalone_expansions:
+          type: array
+          items:
+            type: string
+        expanded_games:
+          type: array
+          items:
+            type: string
+    GuestStar:
+      type: object
+      properties:
+        character:
+          type: string
+        credit_id:
+          type: string
+        order:
+          type: integer
+        adult:
+          type: boolean
+        gender:
+          type: integer
+        id:
+          type: integer
+        known_for_department:
+          type: string
+        name:
+          type: string
+        original_name:
+          type: string
+        popularity:
+          type: number
+          format: float
+        profile_path:
+          type: string
+          nullable: true
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - "ok"
+            - "unavailable"
+          description: Overall health status
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the health check
+        checks:
+          type: object
+          description: Individual component health checks
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+                enum:
+                  - "ok"
+                  - "error"
+              error:
+                type: string
+                nullable: true
+                description: Error message if the health check failed
+    InfoResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Application version
+        debug:
+          type: boolean
+          description: Whether the application is in debug mode
+        frontend_url:
+          type: string
+          format: uri
+          description: Frontend URL
+        language:
+          type: string
+          description: Application language
+        timezone:
+          type: string
+          description: Application timezone
+        admin_enabled:
+          type: boolean
+          description: Whether admin interface is enabled
+        track_time:
+          type: boolean
+          description: Whether time tracking is enabled
+    Item:
+      type: object
+      properties:
+        media_id:
+          type: string
+        source:
+          $ref: "#/components/schemas/Source"
+        media_type:
+          $ref: "#/components/schemas/MediaTypesComplete"
+        title:
+          type: string
+        image:
+          type: string
+          format: uri
+        season_number:
+          type: integer
+          nullable: true
+          description: If the item is a season or an episode, its season number is shown
+        episode_number:
+          type: integer
+          nullable: true
+          description: If the item is an episode, its episode number is shown
+    ItemId:
+      type: string
+      description: media_type/media_source/media_id(/season/episode)
+      nullable: true
+    List:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+          format: uri
+        owner:
+          type: object
+          properties:
+            id:
+              type: number
+              description: The id of the user of the owner
+            username:
+              type: string
+        collaborators:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: number
+                description: The id of the user of the collaborator
+              username:
+                type: string
+        items_count:
+          type: number
+        latest_update:
+          type: string
+          format: timestamp
+    ListsMinimized:
+      type: array
+      items:
+        type: object
+        properties:
+          list_id:
+            type: integer
+          # list_name:
+          #   type: string
+          list_item_id:
+            type: integer
+    ListsNoItems:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+          format: uri
+        owner:
+          type: object
+          properties:
+            id:
+              type: number
+              description: The id of the user of the owner
+            username:
+              type: string
+        collaborators:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: number
+                description: The id of the user of the collaborator
+              username:
+                type: string
+        items_count:
+          type: number
+        latest_update:
+          type: string
+          format: timestamp
+    ListsSortOptions:
+      type: string
+      enum:
+        - items_asc
+        - items_desc
+        - name_asc
+        - name_desc
+        - new_asc
+        - new_desc
+        - update_asc
+        - update_desc
+      x-enumNames:
+        - Items Count Ascending
+        - Items Count Descending
+        - Name Ascending
+        - Name Descending
+        - New Ascending
+        - New Descending
+        - Latest Update Ascending
+        - Latest Update Descending
+      description: |
+        Sorting options for lists:
+          items_asc = Number of items in the list ascending
+          items_desc = Number of items in the list descending
+          name_asc = List name ascending
+          name_desc = List name descending
+          new_asc = Date of creation ascending
+          new_desc = Date of creation descending
+          update_asc = Date of the latest update to the list ascending
+          update_desc = Date of the latest update to the list descending
+      #   type: string
+      #   enum:
+      #     - added_asc
+      #     - added_desc
+      #     - title_asc
+      #     - title_desc
+      #     - progress_asc
+      #     - progress_desc
+      #     - score_asc
+      #     - score_desc
+      #     - start_asc
+      #     - start_desc
+      #     - end_asc
+      #     - end_desc
+      #   x-enumNames:
+      #     - Added Date Ascending
+      #     - Added Date Descending
+      #     - Title Ascending
+      #     - Title Descending
+      #     - Progress Ascending
+      #     - Progress Descending
+      #     - Score Ascending
+      #     - Score Descending
+      #     - Start Date Ascending
+      #     - Start Date Descending
+      #     - End Date Ascending
+      #     - End Date Descending
+      #   description: |
+      #     Sorting options for list items:
+      #       added_asc = Date added to the list
+      #       added_desc = Date added to the list
+      #       title_asc = Media title
+      #       title_desc = Media title
+      #       progress_asc = User progress
+      #       progress_desc = User progress
+      #       score_asc = User score
+      #       score_desc = User score
+      #       start_asc = User start date
+      #       start_desc = User start date
+      #       end_asc = User end date
+      #       end_desc = User end date
+    MangaDetails:
+      # TODO: missing fields
+      type: object
+      nullable: true
+    MangaRelated:
+      # TODO: missing fields
+      type: object
+      nullable: true
+    Media:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The id of the item in the database (not to be confused with the item_id, which is media provider specific)
+          nullable: true
+        consumption_id:
+          type: integer
+          description: The id of the media consumption (id numbers are global for all consumptions of all medias of the same type, not sequential per media)
+          nullable: true
+        item:
+          $ref: "#/components/schemas/Item"
+          nullable: true
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
+          description: If the Item is a Season or an Episode, the parent_id is the id of the Serie or of the Season
+          nullable: true
+        tracked:
+          type: boolean
+          description: If the current media is being tracked by Yamtrack
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+        progressed_at:
+          type: string
+          format: date-time
+          nullable: true
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        lists:
+          $ref: "#/components/schemas/ListsMinimized"
+    MediaStatus:
+      type: integer
+      enum:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+      x-enumNames:
+        - Planning
+        - In progress
+        - Paused
+        - Completed
+        - Dropped
+      description: |
+        Integer mapping for statuses:
+          0 = Planning
+          1 = In progress
+          2 = Paused
+          3 = Completed
+          4 = Dropped
+      nullable: true
+    MediaTypes:
+      type: string
+      enum:
+        - anime
+        - boardgame
+        - book
+        - comic
+        - game
+        - manga
+        - movie
+        - tv
+    MediaTypesComplete:
+      type: string
+      enum:
+        - anime
+        - boardgame
+        - book
+        - comic
+        - episode
+        - game
+        - manga
+        - movie
+        - season
+        - tv
+    MovieDetails:
+      type: object
+      properties:
+        format:
+          type: string
+        release_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        status:
+          type: string
+        runtime:
+          type: string
+          description: Human formatted duration (1h 20m)
+        studios:
+          type: array
+          items:
+            type: string
+        country:
+          type: string
+        languages:
+          type: array
+          items:
+            type: string
+    MovieRelated:
+      type: object
+      nullable: true
+    PaginatedCalendar:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarEvent"
+    PaginatedChangesHistory:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChangesHistoryRecord"
+    PaginatedLists:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lists"
+    PaginatedListsNoItems:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListsNoItems"
+    PaginatedMedia:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Media"
+    PaginatedSearch:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Media"
+    PaginatedConsumptionHistory:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsumptionInfos"
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: The next page URL with updated offset
+        previous:
+          type: string
+          format: uri
+          nullable: true
+          description: The previous page URL with updated offset
+    RelatedMedia:
+      type: array
+      items:
+        type: object
+        properties:
+          source:
+            $ref: "#/components/schemas/Source"
+          media_type:
+            $ref: "#/components/schemas/MediaTypes"
+          image:
+            type: string
+            format: uri
+          media_id:
+            type: string
+          title:
+            type: string
+    SearchItem:
+      # TODO: add item_id and tracked field for already tracked items
+      type: object
+      properties:
+        media_id:
+          type: string
+        source:
+          $ref: "#/components/schemas/Source"
+        media_type:
+          $ref: "#/components/schemas/MediaTypes"
+        title:
+          type: string
+        image:
+          type: string
+          format: uri
+    Season:
+      type: object
+      properties:
+        source:
+          $ref: "#/components/schemas/Source"
+        media_type:
+          type: string
+          enum:
+            - season
+          description: Always "season"
+        image:
+          type: string
+          format: uri
+          nullable: true
+        media_id:
+          type: string
+        title:
+          type: string
+        season_number:
+          type: integer
+        season_title:
+          type: string
+        first_air_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+          nullable: true
+        max_progress:
+          type: integer
+        item_id:
+          $ref: "#/components/schemas/ItemId"
+        parent_id:
+          $ref: "#/components/schemas/ItemId"
+    SeasonDetails:
+      type: object
+      properties:
+        first_air_date:
+          type: string
+          format: date
+          description: Date of the first air date of the season (YYYY-MM-DD)
+        last_air_date:
+          type: string
+          format: date
+          description: Date of the last air date of the season (YYYY-MM-DD)
+        episodes:
+          type: integer
+          description: Number of episodes of the season
+        runtime:
+          type: string
+          description: Human readable episode duration
+        total_runtime:
+          type: string
+          description: Human readable season duration
+        tvdb_id:
+          type: number
+    SeasonRelated:
+      type: object
+      properties:
+        episodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Media"
+    SortOptions:
+      type: string
+      enum:
+        - added_asc
+        - added_desc
+        - ended_asc
+        - ended_desc
+        - episode_asc
+        - episode_desc
+        - id_asc
+        - id_desc
+        - itemid_asc
+        - itemid_desc
+        - mediaid_asc
+        - mediaid_desc
+        - progress_asc
+        - progress_desc
+        - score_asc
+        - score_desc
+        - season_asc
+        - season_desc
+        - source_asc
+        - source_desc
+        - started_asc
+        - started_desc
+        - title_asc
+        - title_desc
+        - type_asc
+        - type_desc
+        - updated_asc
+        - updated_desc
+      x-enumNames:
+        - Added Ascending
+        - Added Descending
+        - Ended Ascending
+        - Ended Descending
+        - Episode Ascending
+        - Episode Descending
+        - ID Ascending
+        - ID Descending
+        - Item ID Ascending
+        - Item ID Descending
+        - Media ID Ascending
+        - Media ID Descending
+        - Progress Ascending
+        - Progress Descending
+        - Score Ascending
+        - Score Descending
+        - Season Ascending
+        - Season Descending
+        - Source Ascending
+        - Source Descending
+        - Started Ascending
+        - Started Descending
+        - Title Ascending
+        - Title Descending
+        - Type Ascending
+        - Type Descending
+        - Updated Ascending
+        - Updated Descending
+      description: |
+        Mapping for sort options:
+          added_asc = Added Ascending
+          added_desc = Added Descending
+          ended_asc = Ended Ascending
+          ended_desc = Ended Descending
+          episode_asc = Episode Ascending
+          episode_desc = Episode Descending
+          id_asc = ID Ascending
+          id_desc = ID Descending
+          itemid_asc = Item ID Ascending
+          itemid_desc = Item ID Descending
+          mediaid_asc = Media ID Ascending
+          mediaid_desc = Media ID Descending
+          progress_asc = Progress Ascending
+          progress_desc = Progress Descending
+          score_asc = Score Ascending
+          score_desc = Score Descending
+          season_asc = Season Ascending
+          season_desc = Season Descending
+          source_asc = Source Ascending
+          source_desc = Source Descending
+          started_asc = Started Ascending
+          started_desc = Started Descending
+          title_asc = Title Ascending
+          title_desc = Title Descending
+          type_asc = Type Ascending
+          type_desc = Type Descending
+          updated_asc = Updated Ascending
+          updated_desc = Updated Descending
+        Note: Season sorts are supported only for seasons and episodes, episode sorts are supported only for episodes
+    Source:
+      type: string
+      enum:
+        - bgg
+        - comicvine
+        - hardcover
+        - igdb
+        - mal
+        - mangaupdates
+        - manual
+        - openlibrary
+        - tmdb
+    StatisticsResponse:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        media_count:
+          type: object
+          description: Number of tracked media
+          properties:
+            total:
+              type: integer
+              description: Total number of tracked media
+            tv:
+              type: integer
+              description: Number of tracked TV shows
+            season:
+              type: integer
+              description: Number of tracked Seasons
+            movie:
+              type: integer
+              description: Number of tracked Movies
+            anime:
+              type: integer
+              description: Number of tracked Animes
+            manga:
+              type: integer
+              description: Number of tracked Mangas
+            game:
+              type: integer
+              description: Number of tracked Games
+            book:
+              type: integer
+              description: Number of tracked Books
+            comic:
+              type: integer
+              description: Number of tracked Comics
+        activity_data:
+          type: object
+          description: Daily activity counts
+        media_type_distribution:
+          type: object
+          description: Formatted data for Chart.js pie chart
+        score_distribution:
+          type: object
+          description: Score distribution for each media type
+        top_rated:
+          type: array
+          items:
+            $ref: "#/components/schemas/Media"
+          description: Array of top rated medias
+        status_distribution:
+          type: object
+          description: Status distribution for each media type
+        status_pie_chart_data:
+          type: object
+          description: Status distribution pie chart
+        timeline:
+          type: object
+          description: Timeline of media consumptions by month
+    TVDetails:
+      type: object
+      properties:
+        format:
+          type: string
+        first_air_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        last_air_date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+        status:
+          type: string
+        seasons:
+          type: integer
+        episodes:
+          type: integer
+        runtime:
+          type: string
+          description: Human formatted duration (1h 20m)
+        studios:
+          type: array
+          items:
+            type: string
+        country:
+          type: string
+        languages:
+          type: array
+          items:
+            type: string
+        tvdb_id:
+          type: integer
+        last_episode_season:
+          type: integer
+        next_episode_season:
+          type: integer
+          nullable: true
+    TVRelated:
+      type: object
+      description: Related media items
+      nullable: true
+      properties:
+        seasons:
+          type: array
+          description: Related seasons
+          items:
+            $ref: "#/components/schemas/Media"
+    # TODO: create reusable schema for updates
+    UpdateAnime:
+      description: |
+        Payload for updating anime. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Episode number
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateBoardGame:
+      description: |
+        Payload for updating board games. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Page number
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateBook:
+      description: |
+        Payload for updating books. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Page number
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateComic:
+      description: |
+        Payload for updating comics. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Page number or issue number
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateEpisode:
+      description: |
+        Payload for updating TV episodes.
+        Only end_date can be modified. Score, status, progress, start_date and notes are read-only.
+      type: object
+      properties:
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+    UpdateGame:
+      description: |
+        Payload for updating games. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Time played in minutes
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateManga:
+      description: |
+        Payload for updating manga. All fields can be modified.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        progress:
+          type: integer
+          nullable: true
+          description: Chapter number
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateMovie:
+      description: |
+        Payload for updating movies.
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateSeason:
+      description: |
+        Payload for updating TV seasons.
+        Only score, status, and notes can be modified.
+        progress, start_date, and end_date are read-only (calculated from episodes).
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        notes:
+          type: string
+          nullable: true
+    UpdateTV:
+      description: |
+        Payload for updating TV shows.
+        Only score, status, and notes can be modified.
+        start_date, end_date, and progress are read-only (calculated from seasons).
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MediaStatus"
+        notes:
+          type: string
+          nullable: true
