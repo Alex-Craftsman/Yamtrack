@@ -1,12 +1,12 @@
 import logging
 from calendar import monthrange
-from datetime import date
+from datetime import date, datetime
 from http import HTTPStatus as HTTP  # noqa: N814
 from urllib.parse import urlencode
 
 from django.db.models import Count, OuterRef, Subquery
-from django.utils.dateparse import parse_date
-from django.utils.timezone import localdate
+from django.utils.dateparse import parse_date, parse_datetime
+from django.utils.timezone import is_naive, localdate, make_aware
 from rest_framework.response import Response
 
 from app.models import (
@@ -507,6 +507,27 @@ def try_parse_date(value):
     return parsed
 
 
+def try_parse_datetime_input(value):
+    """Parse an ISO date or datetime value for writable DateTimeField inputs."""
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, date):
+        parsed = datetime.combine(value, datetime.min.time())
+    else:
+        parsed = parse_datetime(value)
+        if parsed is None:
+            parsed_date = parse_date(value)
+            if parsed_date is None:
+                msg = "Invalid date format"
+                raise ValueError(msg)
+            parsed = datetime.combine(parsed_date, datetime.min.time())
+
+    if is_naive(parsed):
+        parsed = make_aware(parsed)
+
+    return parsed
+
+
 def _validate_score(filtered_body):
     """Validate and convert score field."""
     try:
@@ -537,7 +558,7 @@ def _validate_dates(filtered_body):
             filtered_body["start_date"] = None
         else:
             try:
-                filtered_body["start_date"] = try_parse_date(start_date)
+                filtered_body["start_date"] = try_parse_datetime_input(start_date)
             except (TypeError, ValueError):
                 return None, "Invalid start_date format."
 
@@ -547,7 +568,7 @@ def _validate_dates(filtered_body):
             filtered_body["end_date"] = None
         else:
             try:
-                filtered_body["end_date"] = try_parse_date(end_date)
+                filtered_body["end_date"] = try_parse_datetime_input(end_date)
             except (TypeError, ValueError):
                 return None, "Invalid end_date format."
 

@@ -1089,6 +1089,32 @@ class MediaCoreTests(YamtrackApiTestCase):
         check_consumption_structure(self, payload)
         self.assertEqual(payload["notes"], "updated-from-test")
 
+    def test_media_consumption_entry_detail_patch_accepts_datetime_strings(self):
+        """Entry-detail PATCH should accept ISO datetime values for date fields."""
+        movie_item = self.items_by_type[MediaTypes.MOVIE.value][0]
+        consumption_id = self.movie_medias[0].id
+        response = self.call_api(
+            "patch",
+            "api_media_consumption_entry_detail",
+            args=(
+                MediaTypes.MOVIE.value,
+                movie_item.source,
+                movie_item.media_id,
+                consumption_id,
+            ),
+            payload={
+                "start_date": "2023-10-01T00:00:00Z",
+                "end_date": "2023-10-02T15:30:00Z",
+            },
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        check_consumption_structure(self, payload)
+        self.assertTrue(payload["start_date"].startswith("2023-10-01T00:00:00"))
+        self.assertTrue(payload["end_date"].startswith("2023-10-02T15:30:00"))
+
     def test_media_consumption_entry_detail_patch_invalid_payload_returns_bad_request(
         self,
     ):
