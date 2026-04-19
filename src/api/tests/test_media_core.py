@@ -997,6 +997,32 @@ class MediaCoreTests(YamtrackApiTestCase):
         payload = response.json()
         check_consumption_structure(self, payload)
 
+    def test_media_consumption_entry_detail_get_preserves_actual_progress(self):
+        """Entry-detail endpoint should return the stored non-binary progress value."""
+        game_item = self.items_by_type[MediaTypes.GAME.value][0]
+        game_media = self.game_medias[0]
+        game_media.progress = 120
+        game_media.status = Status.IN_PROGRESS.value
+        game_media.save(update_fields=["progress", "status"])
+
+        response = self.call_api(
+            "get",
+            "api_media_consumption_entry_detail",
+            args=(
+                MediaTypes.GAME.value,
+                game_item.source,
+                game_item.media_id,
+                game_media.id,
+            ),
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        check_consumption_structure(self, payload)
+        self.assertEqual(payload["progress"], 120)
+        self.assertEqual(payload["status"], 1)
+
     def test_media_consumption_entry_detail_invalid_type_methods(self):
         """Entry-detail endpoints should reject unsupported media types."""
         for method in ["get", "patch", "delete"]:

@@ -28,7 +28,6 @@ from .helpers import (
     build_item_id,
     build_parent_id,
     get_media_status,
-    get_progress_from_status,
 )
 
 
@@ -541,7 +540,7 @@ class HistorySerializer(serializers.Serializer):
             "score": float(instance.score)
             if hasattr(instance, "score") and instance.score is not None
             else None,
-            "progress": get_progress_from_status(status),
+            "progress": instance.progress if hasattr(instance, "progress") else None,
             "progressed_at": instance.progressed_at
             if hasattr(instance, "progressed_at") and instance.progressed_at is not None
             else None,
