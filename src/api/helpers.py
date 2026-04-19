@@ -1,6 +1,7 @@
 import logging
 from calendar import monthrange
 from datetime import date
+from http import HTTPStatus as HTTP  # noqa: N814
 from urllib.parse import urlencode
 
 from django.db.models import Count, OuterRef, Subquery
@@ -27,20 +28,6 @@ from lists.models import CustomListItem
 from users.models import MediaStatusChoices
 
 logger = logging.getLogger(__name__)
-
-HTTP_STATUS_MAP = {
-    200: "OK.",
-    201: "Created.",
-    202: "Accepted.",
-    204: "No content.",
-    400: "Bad request.",
-    401: "Unauthorized.",
-    403: "Permission denied.",
-    404: "Not found.",
-    405: "Method not allowed.",
-    500: "Internal server error.",
-    501: "Not implemented.",
-}
 
 MEDIA_MODIFIABLE_FIELDS = {
     MediaTypes.MOVIE.value: {"score", "status", "start_date", "end_date", "notes"},
@@ -350,11 +337,6 @@ def get_sorts(media_type, *, sort_type="all"):
     return []
 
 
-def get_http_message(status):
-    """Return the standard HTTP status message for the given status code."""
-    return HTTP_STATUS_MAP.get(status, "Unknown status.")
-
-
 def get_media_status(status, *, reverse=False):
     """Transform the media status from integer to a valid class."""
     if reverse:
@@ -433,8 +415,8 @@ def parse_limit_offset(request):
                 None,
                 None,
                 Response(
-                    {"detail": get_http_message(400) + " Invalid limit parameter"},
-                    status=400,
+                    {"detail": "Invalid limit parameter"},
+                    status=HTTP.BAD_REQUEST,
                 ),
             )
     if raw_offset in [None, ""]:
@@ -447,8 +429,8 @@ def parse_limit_offset(request):
                 None,
                 None,
                 Response(
-                    {"detail": get_http_message(400) + " Invalid offset parameter"},
-                    status=400,
+                    {"detail": "Invalid offset parameter"},
+                    status=HTTP.BAD_REQUEST,
                 ),
             )
     if limit <= 0 or offset < 0:
@@ -458,10 +440,9 @@ def parse_limit_offset(request):
             None,
             Response(
                 {
-                    "detail": get_http_message(400)
-                    + " limit must be >0 and offset must be >=0",
+                    "detail": "limit must be >0 and offset must be >=0",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             ),
         )
 
@@ -667,8 +648,8 @@ def apply_manual_sort_for_type(results, sort):
     """Apply manual sorts used when a single media type is requested."""
     if sort not in _AGGREGATED_MANUAL_SORT_KEYS:
         return Response(
-            {"detail": get_http_message(400) + " Invalid sorting"},
-            status=400,
+            {"detail": "Invalid sorting"},
+            status=HTTP.BAD_REQUEST,
         )
     results.sort(key=_AGGREGATED_MANUAL_SORT_KEYS[sort])
     return results
@@ -693,8 +674,8 @@ def apply_aggregated_sort(results, sort):
     """Apply sorting for the aggregated (multi-type) results."""
     if sort not in _AGGREGATED_SORT_KEYS:
         return Response(
-            {"detail": get_http_message(400) + " Invalid sorting"},
-            status=400,
+            {"detail": "Invalid sorting"},
+            status=HTTP.BAD_REQUEST,
         )
     results.sort(key=_AGGREGATED_SORT_KEYS[sort])
     return results

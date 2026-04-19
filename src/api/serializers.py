@@ -27,7 +27,6 @@ from .changes_history_processor import (
 from .helpers import (
     build_item_id,
     build_parent_id,
-    get_http_message,
     get_media_status,
     get_progress_from_status,
 )
@@ -701,8 +700,7 @@ class MixedMediaSerializer(serializers.Serializer):
 
         if serializer_class is None:
             msg = (
-                get_http_message(500)
-                + f" No serializer found for type {instance_type}. "
+                f"No serializer found for type {instance_type}. "
                 f"Supported types: {list(serializer_map.keys())}."
             )
             raise ValueError(msg)
@@ -812,8 +810,7 @@ def serialize_data(
 
             if detected_serializer_class is None:
                 msg = (
-                    get_http_message(500)
-                    + f" No serializer found for data type {first_type}. "
+                    f"No serializer found for data type {first_type}. "
                     f"Supported types: {list(serializer_map.keys())}. "
                     f"Pass serializer_class explicitly if needed."
                 )
@@ -836,7 +833,7 @@ def serialize_data(
 
     if detected_serializer_class is None:
         msg = (
-            get_http_message(500) + f" No serializer found for data type {data_type}. "
+            f"No serializer found for data type {data_type}. "
             f"Supported types: {list(serializer_map.keys())}. "
             f"Pass serializer_class explicitly if needed."
         )

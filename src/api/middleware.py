@@ -1,10 +1,9 @@
 import logging
+from http import HTTPStatus as HTTP  # noqa: N814
 
 from django.conf import settings
 from django.http import JsonResponse
 from django.template.response import ContentNotRenderedError, TemplateResponse
-
-from .helpers import get_http_message
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class ApiJsonErrorMiddleware:
 
         if path.startswith("/api/") and response is not None:
             response = self._handle_template_response(response, path)
-            status = getattr(response, "status_code", 200)
+            status = getattr(response, "status_code", HTTP.OK)
             content_type = self._get_content_type(response)
 
             if self._should_convert_to_json(status, content_type):
@@ -70,12 +69,18 @@ class ApiJsonErrorMiddleware:
         """Determine if response should be converted to JSON."""
         if content_type and "application/json" in content_type:
             return False
-        return status >= 400 and (not content_type or "html" in content_type.lower())  # noqa: PLR2004
+        return status >= HTTP.BAD_REQUEST and (
+            not content_type or "html" in content_type.lower()
+        )
 
     def _build_json_error_response(self, response, status):
         """Build JSON error response."""
-        message = get_http_message(status)
-        payload = {"detail": message}
+        try:
+            detail = HTTP(status).phrase
+        except ValueError:
+            detail = "Unknown status"
+
+        payload = {"detail": detail}
 
         if settings.DEBUG and hasattr(response, "content"):
             detail = self._extract_debug_detail(response)
@@ -106,4 +111,4 @@ class ApiJsonErrorMiddleware:
 
         detail = str(exception) if settings.DEBUG else "Internal server error."
 
-        return JsonResponse({"detail": detail}, status=500)
+        return JsonResponse({"detail": detail}, status=HTTP.INTERNAL_SERVER_ERROR)

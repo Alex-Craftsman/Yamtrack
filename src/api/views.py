@@ -1,4 +1,5 @@
 import asyncio
+from http import HTTPStatus as HTTP  # noqa: N814
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -41,7 +42,6 @@ from .helpers import (
     check_valid_type,
     fetch_results_all_types,
     fetch_results_for_type,
-    get_http_message,
     get_item_lists,
     get_media_status,
     get_sorts,
@@ -112,8 +112,8 @@ class CalendarView(drf_views.APIView):
             )
         except (TypeError, ValueError):
             return Response(
-                {"detail": get_http_message(400) + " Invalid date format."},
-                status=400,
+                {"detail": "Invalid date format."},
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -121,11 +121,10 @@ class CalendarView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500)
-                    + " Error occurred while fetching events.",
+                    "detail": "Error occurred while fetching events.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         paginated_data = paginate_data(request, releases, limit, offset)
@@ -148,8 +147,8 @@ class CalendarUpdateView(drf_views.APIView):
         """Trigger calendar events update for the authenticated user."""
         tasks.reload_calendar.delay(request.user)
         return Response(
-            {"detail": get_http_message(202) + " Task queued"},
-            status=202,
+            {"detail": "Task queued"},
+            status=HTTP.ACCEPTED,
         )
 
 
@@ -163,8 +162,8 @@ class MediaTypeChangesHistoryDetailView(drf_views.APIView):
         """Retrieve the changes history record for a specific media."""
         if not check_valid_type(media_type, complete=True):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -174,37 +173,37 @@ class MediaTypeChangesHistoryDetailView(drf_views.APIView):
                 context={"media_type": media_type},
                 serializer_class=ChangesHistoryEntrySerializer,
             )
-            return Response(serialized_data, status=200)
+            return Response(serialized_data, status=HTTP.OK)
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(404) + " History record not found",
+                    "detail": "History record not found",
                     "errors": str(e),
                 },
-                status=404,
+                status=HTTP.NOT_FOUND,
             )
 
     def delete(self, request, media_type, history_id):
         """Delete the changes history record for a specific media."""
         if not check_valid_type(media_type, complete=True):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
             delete_changes_history_entry(media_type, history_id, request.user)
             return Response(
-                {"detail": get_http_message(204) + " Record removed correctly"},
-                status=204,
+                {"detail": "Record removed correctly"},
+                status=HTTP.NO_CONTENT,
             )
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(404) + " History record not found",
+                    "detail": "History record not found",
                     "errors": str(e),
                 },
-                status=404,
+                status=HTTP.NOT_FOUND,
             )
 
 
@@ -247,7 +246,7 @@ class HealthView(drf_views.APIView):
             health_data,
             serializer_class=HealthResponseSerializer,
         )
-        status_code = 500 if errors else 200
+        status_code = HTTP.INTERNAL_SERVER_ERROR if errors else HTTP.OK
         return Response(response_data, status=status_code)
 
 
@@ -265,7 +264,7 @@ class InfoView(drf_views.APIView):
             info_data,
             serializer_class=InfoSerializer,
         )
-        return Response(response_data, status=200)
+        return Response(response_data, status=HTTP.OK)
 
 
 # /api/v1/lists/
@@ -293,8 +292,8 @@ class ListsView(drf_views.APIView):
         sorted_lists = apply_list_sort(custom_lists, sort, sort_order)
         if sorted_lists is None:
             return Response(
-                {"detail": get_http_message(404) + " Invalid sorting"},
-                status=404,
+                {"detail": "Invalid sorting"},
+                status=HTTP.NOT_FOUND,
             )
 
         paginated_data = paginate_data(request, sorted_lists, limit, offset)
@@ -304,7 +303,7 @@ class ListsView(drf_views.APIView):
             context={"include_items": False},
         )
         paginated_data["results"] = serialized_data
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
     def post(self, request):
         """Create a new custom list for the authenticated user."""
@@ -313,15 +312,15 @@ class ListsView(drf_views.APIView):
 
         if not body:
             return Response(
-                {"detail": get_http_message(400) + " Missing body."},
-                status=400,
+                {"detail": "Missing body."},
+                status=HTTP.BAD_REQUEST,
             )
 
         name = body.get("name", "").strip()
         if not name:
             return Response(
-                {"detail": get_http_message(400) + " Field 'name' is required."},
-                status=400,
+                {"detail": "Field 'name' is required."},
+                status=HTTP.BAD_REQUEST,
             )
         description = body.get("description", "")
         collaborator_ids = body.get("collaborators", [])
@@ -329,10 +328,9 @@ class ListsView(drf_views.APIView):
         if collaborator_ids and not isinstance(collaborator_ids, list):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Field 'collaborators' must be an array of user IDs.",
+                    "detail": "Field 'collaborators' must be an array of user IDs.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -350,10 +348,9 @@ class ListsView(drf_views.APIView):
                     custom_list.delete()
                     return Response(
                         {
-                            "detail": get_http_message(400)
-                            + " One or more collaborator IDs are invalid.",
+                            "detail": "One or more collaborator IDs are invalid.",
                         },
-                        status=400,
+                        status=HTTP.BAD_REQUEST,
                     )
 
                 custom_list.collaborators.set(collaborators)
@@ -362,16 +359,15 @@ class ListsView(drf_views.APIView):
                 custom_list,
                 context={"include_items": False},
             )
-            return Response(serialized_data, status=201)
+            return Response(serialized_data, status=HTTP.CREATED)
 
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500)
-                    + " An error occurred while creating the list.",
+                    "detail": "An error occurred while creating the list.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
 
@@ -389,21 +385,20 @@ class ListDetailView(drf_views.APIView):
             custom_list = CustomList.objects.get(id=list_id)
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not custom_list.user_can_delete(user):
             return Response(
                 {
-                    "detail": get_http_message(403)
-                    + " You do not have permission to delete this list.",
+                    "detail": "You do not have permission to delete this list.",
                 },
-                status=403,
+                status=HTTP.FORBIDDEN,
             )
 
         custom_list.delete()
-        return Response(status=204)
+        return Response(status=HTTP.NO_CONTENT)
 
     def get(self, request, list_id):
         """Retrieve details and paginated items of a specific list."""
@@ -418,17 +413,16 @@ class ListDetailView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_view(user):
             return Response(
                 {
-                    "detail": get_http_message(403)
-                    + " You do not have permission to view this list.",
+                    "detail": "You do not have permission to view this list.",
                 },
-                status=403,
+                status=HTTP.FORBIDDEN,
             )
 
         items = user_list.items.all()
@@ -461,8 +455,8 @@ class ListDetailView(drf_views.APIView):
             sort, sort_order = parse_sort_filter(sort_filter)
             if sort not in get_sorts(None, sort_type="all"):
                 return Response(
-                    {"detail": get_http_message(404) + " Invalid sorting"},
-                    status=404,
+                    {"detail": "Invalid sorting"},
+                    status=HTTP.NOT_FOUND,
                 )
             media_objects = apply_aggregated_sort(media_objects, sort)
             if isinstance(media_objects, Response):
@@ -480,7 +474,7 @@ class ListDetailView(drf_views.APIView):
             },
         )
 
-        return Response(serialized_list, status=200)
+        return Response(serialized_list, status=HTTP.OK)
 
     def patch(self, request, list_id):
         """Update a specific custom list."""
@@ -492,17 +486,16 @@ class ListDetailView(drf_views.APIView):
             custom_list = CustomList.objects.get(id=list_id)
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not custom_list.user_can_edit(user):
             return Response(
                 {
-                    "detail": get_http_message(403)
-                    + " You do not have permission to edit this list.",
+                    "detail": "You do not have permission to edit this list.",
                 },
-                status=403,
+                status=HTTP.FORBIDDEN,
             )
 
         name = body.get("name")
@@ -517,19 +510,17 @@ class ListDetailView(drf_views.APIView):
             if not isinstance(collaborator_ids, list):
                 return Response(
                     {
-                        "detail": get_http_message(400)
-                        + " Field 'collaborators' must be an array of user IDs.",
+                        "detail": "Field 'collaborators' must be an array of user IDs.",
                     },
-                    status=400,
+                    status=HTTP.BAD_REQUEST,
                 )
             collaborators = get_user_model().objects.filter(id__in=collaborator_ids)
             if collaborators.count() != len(collaborator_ids):
                 return Response(
                     {
-                        "detail": get_http_message(400)
-                        + " One or more collaborator IDs are invalid.",
+                        "detail": "One or more collaborator IDs are invalid.",
                     },
-                    status=400,
+                    status=HTTP.BAD_REQUEST,
                 )
             custom_list.collaborators.set(collaborators)
 
@@ -538,7 +529,7 @@ class ListDetailView(drf_views.APIView):
             custom_list,
             context={"request": request},
         )
-        return Response(serialized_data, status=200)
+        return Response(serialized_data, status=HTTP.OK)
 
 
 # /api/v1/lists/[list_id]/items/
@@ -558,17 +549,16 @@ class ListItemsView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_view(user):
             return Response(
                 {
-                    "detail": get_http_message(403)
-                    + " You do not have permission to view this list.",
+                    "detail": "You do not have permission to view this list.",
                 },
-                status=403,
+                status=HTTP.FORBIDDEN,
             )
 
         items = user_list.items.all()
@@ -601,8 +591,8 @@ class ListItemsView(drf_views.APIView):
             sort, sort_order = parse_sort_filter(sort_filter)
             if sort not in get_sorts(None, sort_type="all"):
                 return Response(
-                    {"detail": get_http_message(404) + " Invalid sorting"},
-                    status=404,
+                    {"detail": "Invalid sorting"},
+                    status=HTTP.NOT_FOUND,
                 )
             media_objects = apply_aggregated_sort(media_objects, sort)
             if isinstance(media_objects, Response):
@@ -622,7 +612,7 @@ class ListItemsView(drf_views.APIView):
             homogeneous=False,
         )
         paginated_data["results"] = serialized_data
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/lists/[list_id]/items/[item_id]/
@@ -642,29 +632,28 @@ class ListItemView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_edit(user):
             return Response(
                 {
-                    "detail": get_http_message(403)
-                    + " You do not have permission to edit this list.",
+                    "detail": "You do not have permission to edit this list.",
                 },
-                status=403,
+                status=HTTP.FORBIDDEN,
             )
 
         try:
             list_item = user_list.get_list_item(item_id, include_item=True)
         except CustomListItem.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " Item not found in the list."},
-                status=404,
+                {"detail": "Item not found in the list."},
+                status=HTTP.NOT_FOUND,
             )
 
         list_item.delete()
-        return Response(status=204)
+        return Response(status=HTTP.NO_CONTENT)
 
     def get(self, request, list_id, item_id):
         """Get details of a list item."""
@@ -679,17 +668,16 @@ class ListItemView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_view(user):
             return Response(
                 {
-                    "detail": get_http_message(403)
-                    + " You don't have permission to view this list.",
+                    "detail": "You don't have permission to view this list.",
                 },
-                status=403,
+                status=HTTP.FORBIDDEN,
             )
 
         try:
@@ -697,8 +685,8 @@ class ListItemView(drf_views.APIView):
             item = list_item.item
         except CustomListItem.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " Item not found in the list."},
-                status=404,
+                {"detail": "Item not found in the list."},
+                status=HTTP.NOT_FOUND,
             )
 
         view_class = MediaDetailView
@@ -751,8 +739,8 @@ class MediaListView(drf_views.APIView):
         status = parse_status_param(status)
         if status is None:
             return Response(
-                {"detail": get_http_message(404) + " Invalid status"},
-                status=404,
+                {"detail": "Invalid status"},
+                status=HTTP.NOT_FOUND,
             )
 
         sort, sort_order = parse_sort_filter(sort_filter)
@@ -760,8 +748,8 @@ class MediaListView(drf_views.APIView):
         if media_type:
             if not check_valid_type(media_type, complete=True):
                 return Response(
-                    {"detail": get_http_message(400) + " Unsupported media type."},
-                    status=400,
+                    {"detail": "Unsupported media type."},
+                    status=HTTP.BAD_REQUEST,
                 )
             results, has_error = fetch_results_for_type(
                 user,
@@ -784,8 +772,8 @@ class MediaListView(drf_views.APIView):
 
         if has_error:
             return Response(
-                {"detail": get_http_message(404) + " Invalid sorting"},
-                status=404,
+                {"detail": "Invalid sorting"},
+                status=HTTP.NOT_FOUND,
             )
 
         if isinstance(results, Response):
@@ -808,7 +796,7 @@ class MediaListView(drf_views.APIView):
             homogeneous=False,
         )
         paginated_data["results"] = serialized_data
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/
@@ -831,16 +819,16 @@ class MediaTypeListView(drf_views.APIView):
         status = parse_status_param(status)
         if status is None:
             return Response(
-                {"detail": get_http_message(404) + " Invalid status"},
-                status=404,
+                {"detail": "Invalid status"},
+                status=HTTP.NOT_FOUND,
             )
 
         sort, sort_order = parse_sort_filter(sort_filter)
 
         if not check_valid_type(media_type, complete=True):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
         results, has_error = fetch_results_for_type(
             user,
@@ -852,8 +840,8 @@ class MediaTypeListView(drf_views.APIView):
 
         if has_error:
             return Response(
-                {"detail": get_http_message(404) + " Invalid sorting"},
-                status=404,
+                {"detail": "Invalid sorting"},
+                status=HTTP.NOT_FOUND,
             )
 
         if isinstance(results, Response):
@@ -875,20 +863,20 @@ class MediaTypeListView(drf_views.APIView):
             many=True,
         )
         paginated_data["results"] = serialized_data
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
     def post(self, request, media_type):
         """Track a new media item of a specific media type."""
         if not check_valid_type(media_type, complete=True):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not request.data:
             return Response(
-                {"detail": get_http_message(400) + " Missing body."},
-                status=400,
+                {"detail": "Missing body."},
+                status=HTTP.BAD_REQUEST,
             )
 
         body = request.data
@@ -907,10 +895,10 @@ class MediaTypeListView(drf_views.APIView):
             if not form.is_valid():
                 return Response(
                     {
-                        "detail": get_http_message(400) + " Invalid form data.",
+                        "detail": "Invalid form data.",
                         "errors": form.errors,
                     },
-                    status=400,
+                    status=HTTP.BAD_REQUEST,
                 )
 
             try:
@@ -923,7 +911,7 @@ class MediaTypeListView(drf_views.APIView):
                     media_name += f" - Episode {form.cleaned_data['episode_number']}"
                 return Response(
                     {"detail": f"Conflict. {media_name} already exists."},
-                    status=409,
+                    status=HTTP.CONFLICT,
                 )
 
             media_data = dict(body)
@@ -933,10 +921,10 @@ class MediaTypeListView(drf_views.APIView):
                 item.delete()
                 return Response(
                     {
-                        "detail": get_http_message(400) + " Invalid media data.",
+                        "detail": "Invalid media data.",
                         "errors": media_form.errors,
                     },
-                    status=400,
+                    status=HTTP.BAD_REQUEST,
                 )
 
             media_form.instance.user = request.user
@@ -950,16 +938,15 @@ class MediaTypeListView(drf_views.APIView):
 
             media_form.save()
             serialized_data = serialize_data(media_form.instance)
-            return Response(serialized_data, status=201)
+            return Response(serialized_data, status=HTTP.CREATED)
 
         media_id = body.get("media_id")
         if not media_id:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " 'media_id' is required for provider sources.",
+                    "detail": "'media_id' is required for provider sources.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         season_number = body.get("season_number")
@@ -974,10 +961,10 @@ class MediaTypeListView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500) + " Internal Server Error.",
+                    "detail": "Internal Server Error.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         defaults = {"title": metadata.get("title"), "image": metadata.get("image")}
@@ -994,17 +981,17 @@ class MediaTypeListView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500) + " Internal Server Error.",
+                    "detail": "Internal Server Error.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         model = MEDIA_TYPE_COMPLETE_MODEL_MAP.get(media_type)
         if model is None:
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         instance = model(item=item, user=request.user)
@@ -1015,15 +1002,15 @@ class MediaTypeListView(drf_views.APIView):
         if not media_form.is_valid():
             return Response(
                 {
-                    "detail": get_http_message(400) + " Invalid media data.",
+                    "detail": "Invalid media data.",
                     "errors": media_form.errors,
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         media_form.save()
         serialized_data = serialize_data(media_form.instance)
-        return Response(serialized_data, status=201)
+        return Response(serialized_data, status=HTTP.CREATED)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/
@@ -1039,17 +1026,16 @@ class MediaDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -1062,23 +1048,23 @@ class MediaDetailView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500) + " Internal Server Error.",
+                    "detail": "Internal Server Error.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not user_medias:
             return Response(
-                {"detail": get_http_message(404) + " Media not found or not tracked."},
-                status=404,
+                {"detail": "Media not found or not tracked."},
+                status=HTTP.NOT_FOUND,
             )
 
         for media in user_medias:
             media.delete()
 
         return Response(
-            status=204,
+            status=HTTP.NO_CONTENT,
         )
 
     def get(self, request, media_type, source, media_id):
@@ -1087,25 +1073,27 @@ class MediaDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
             media_metadata = services.get_media_metadata(media_type, media_id, source)
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         try:
@@ -1117,8 +1105,11 @@ class MediaDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if (
@@ -1168,7 +1159,7 @@ class MediaDetailView(drf_views.APIView):
             data,
             serializer_class=CompleteMediaSerializer,
         )
-        return Response(serialized, status=200)
+        return Response(serialized, status=HTTP.OK)
 
     def patch(self, request, media_type, source, media_id):
         """Update a tracked media item."""
@@ -1176,17 +1167,16 @@ class MediaDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         body = request.data or {}
@@ -1200,14 +1190,17 @@ class MediaDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not user_medias:
             return Response(
-                {"detail": get_http_message(404) + " Media not found or not tracked."},
-                status=404,
+                {"detail": "Media not found or not tracked."},
+                status=HTTP.NOT_FOUND,
             )
 
         media = user_medias[0]
@@ -1216,8 +1209,8 @@ class MediaDetailView(drf_views.APIView):
 
         if error:
             return Response(
-                {"detail": get_http_message(400) + f" {error}"},
-                status=400,
+                {"detail": f"{error}"},
+                status=HTTP.BAD_REQUEST,
             )
 
         for field, value in validated_body.items():
@@ -1229,10 +1222,10 @@ class MediaDetailView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(400) + " Failed to update media.",
+                    "detail": "Failed to update media.",
                     "errors": str(e),
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         media.refresh_from_db()
@@ -1242,10 +1235,10 @@ class MediaDetailView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500) + " Internal Server Error.",
+                    "detail": "Internal Server Error.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if (
@@ -1267,7 +1260,7 @@ class MediaDetailView(drf_views.APIView):
             data,
             serializer_class=CompleteMediaSerializer,
         )
-        return Response(serialized, status=200)
+        return Response(serialized, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/changes_history/
@@ -1284,17 +1277,16 @@ class MediaChangesHistoryView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         user_medias = BasicMedia.objects.filter_media(
@@ -1306,8 +1298,8 @@ class MediaChangesHistoryView(drf_views.APIView):
 
         if not user_medias:
             return Response(
-                {"detail": get_http_message(404) + " Media not found or not tracked."},
-                status=404,
+                {"detail": "Media not found or not tracked."},
+                status=HTTP.NOT_FOUND,
             )
 
         entries = get_changes_history_entries(user_medias, media_type)
@@ -1324,7 +1316,7 @@ class MediaChangesHistoryView(drf_views.APIView):
             context={"media_type": media_type},
             serializer_class=ChangesHistoryEntrySerializer,
         )
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/history/
@@ -1342,17 +1334,16 @@ class MediaConsumptionHistoryView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -1365,16 +1356,16 @@ class MediaConsumptionHistoryView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500) + " Internal Server Error.",
+                    "detail": "Internal Server Error.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not user_medias:
             return Response(
-                {"detail": get_http_message(404) + " Media not found or not tracked."},
-                status=404,
+                {"detail": "Media not found or not tracked."},
+                status=HTTP.NOT_FOUND,
             )
 
         # TODO: missing sorting
@@ -1390,7 +1381,7 @@ class MediaConsumptionHistoryView(drf_views.APIView):
             many=True,
         )
         paginated_data["results"] = consumptions
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/history/[consumption_id]/
@@ -1404,17 +1395,16 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
         """Delete a specific consumption history entry for a specific media."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -1427,38 +1417,37 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500) + " Internal Server Error.",
+                    "detail": "Internal Server Error.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         consumption = user_medias.filter(id=consumption_id).first()
         if not consumption:
             return Response(
-                {"detail": get_http_message(404) + " Consumption entry not found."},
-                status=404,
+                {"detail": "Consumption entry not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         consumption.delete()
 
-        return Response(status=204)
+        return Response(status=HTTP.NO_CONTENT)
 
     def get(self, request, media_type, source, media_id, consumption_id):
         """Retrieve a specific consumption history entry for a specific media."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -1470,38 +1459,40 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         consumption = user_medias.filter(id=consumption_id).first()
         if not consumption:
             return Response(
-                {"detail": get_http_message(404) + "  Consumption entry not found."},
-                status=404,
+                {"detail": " Consumption entry not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         serialized_data = serialize_data(
             consumption,
             serializer_class=HistorySerializer,
         )
-        return Response(serialized_data, status=200)
+        return Response(serialized_data, status=HTTP.OK)
 
     def patch(self, request, media_type, source, media_id, consumption_id):
         """Update a specific consumption history entry for a specific media."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -1513,15 +1504,18 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         consumption = user_medias.filter(id=consumption_id).first()
         if not consumption:
             return Response(
-                {"detail": get_http_message(404) + " Consumption entry not found."},
-                status=404,
+                {"detail": "Consumption entry not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         body = request.data or {}
@@ -1530,8 +1524,8 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
 
         if error:
             return Response(
-                {"detail": get_http_message(400), "errors": str(error)},
-                status=400,
+                {"detail": HTTP.BAD_REQUEST.phrase, "errors": str(error)},
+                status=HTTP.BAD_REQUEST,
             )
 
         for field, value in validated_body.items():
@@ -1542,8 +1536,8 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
             consumption.save()
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(400), "errors": str(e)},
-                status=400,
+                {"detail": HTTP.BAD_REQUEST.phrase, "errors": str(e)},
+                status=HTTP.BAD_REQUEST,
             )
 
         consumption.refresh_from_db()
@@ -1552,7 +1546,7 @@ class MediaConsumptionEntryDetailView(drf_views.APIView):
             consumption,
             serializer_class=HistorySerializer,
         )
-        return Response(serialized_data, status=200)
+        return Response(serialized_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/lists/
@@ -1569,23 +1563,22 @@ class MediaListsView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
         # TODO: if media doesn't exist in the provider it should return 404
         lists = get_item_lists(user, media_id, source, media_type)
         paginated_data = paginate_data(request, lists, limit, offset)
 
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/lists/[list_id]/
@@ -1598,17 +1591,16 @@ class MediaListDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -1619,14 +1611,14 @@ class MediaListDetailView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_edit(user):
             return Response(
-                {"detail": get_http_message(403)},
-                status=403,
+                {"detail": HTTP.FORBIDDEN.phrase},
+                status=HTTP.FORBIDDEN,
             )
 
         try:
@@ -1637,12 +1629,12 @@ class MediaListDetailView(drf_views.APIView):
             )
         except CustomListItem.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " Media not found in the list."},
-                status=404,
+                {"detail": "Media not found in the list."},
+                status=HTTP.NOT_FOUND,
             )
 
         list_item.delete()
-        return Response(status=204)
+        return Response(status=HTTP.NO_CONTENT)
 
     def put(self, request, media_type, source, media_id, list_id):
         """Add a specific media to a specific list."""
@@ -1650,17 +1642,16 @@ class MediaListDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -1671,14 +1662,14 @@ class MediaListDetailView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_edit(user):
             return Response(
-                {"detail": get_http_message(403)},
-                status=403,
+                {"detail": HTTP.FORBIDDEN.phrase},
+                status=HTTP.FORBIDDEN,
             )
 
         try:
@@ -1689,21 +1680,21 @@ class MediaListDetailView(drf_views.APIView):
             )
         except Item.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " Media not found."},
-                status=404,
+                {"detail": "Media not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if user_list.items.filter(id=item.id).exists():
             return Response(
-                {"detail": get_http_message(409) + " Media already in the list."},
-                status=409,
+                {"detail": "Media already in the list."},
+                status=HTTP.CONFLICT,
             )
 
         user_list.items.add(item)
 
         lists = get_item_lists(user, media_id, source, media_type)
 
-        return Response(lists, status=200)
+        return Response(lists, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/recommendations/
@@ -1717,25 +1708,27 @@ class MediaRecommendationsView(drf_views.APIView):
         """Retrieve recommendations for a specific media."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
             media_metadata = services.get_media_metadata(media_type, media_id, source)
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         recommendations = []
@@ -1746,7 +1739,7 @@ class MediaRecommendationsView(drf_views.APIView):
         ):
             recommendations = media_metadata["related"]["recommendations"]
 
-        return Response(recommendations, status=200)
+        return Response(recommendations, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/seasons/
@@ -1764,34 +1757,35 @@ class MediaSeasonsView(drf_views.APIView):
 
         if not check_valid_type(media_type) or media_type != MediaTypes.TV.value:
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
             media_metadata = services.get_media_metadata(media_type, media_id, source)
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         seasons = []
@@ -1903,7 +1897,7 @@ class MediaSeasonsView(drf_views.APIView):
             },
             serializer_class=MediaSerializer,
         )
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/sync/
@@ -1916,23 +1910,22 @@ class MediaSyncView(drf_views.APIView):
         """Trigger sync of metadata from provider (non-manual sources only)."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if source == Sources.MANUAL.value:
             return Response(
-                {"detail": get_http_message(400) + " Manual items cannot be synced."},
-                status=400,
+                {"detail": "Manual items cannot be synced."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot sync `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot sync `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         cache_key = f"{source}_{media_type}_{media_id}"
@@ -1941,10 +1934,11 @@ class MediaSyncView(drf_views.APIView):
         if ttl is not None and ttl > (settings.CACHE_TIMEOUT - 3):
             response = Response(
                 {
-                    "detail": get_http_message(429)
-                    + " The data was recently synced, please wait a few seconds.",
+                    "detail": (
+                        "The data was recently synced, please wait a few seconds."
+                    ),
                 },
-                status=429,
+                status=HTTP.TOO_MANY_REQUESTS,
             )
             response["Retry-After"] = str(ttl)
             return response
@@ -1971,14 +1965,17 @@ class MediaSyncView(drf_views.APIView):
             item.fetch_releases(delay=False)
 
             return Response(
-                {"detail": get_http_message(202) + " Metadata synced successfully."},
-                status=202,
+                {"detail": "Metadata synced successfully."},
+                status=HTTP.ACCEPTED,
             )
 
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
 
@@ -1995,26 +1992,24 @@ class MediaSeasonDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -2027,21 +2022,24 @@ class MediaSeasonDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not user_medias:
             return Response(
-                {"detail": get_http_message(404) + " Season not found or not tracked."},
-                status=404,
+                {"detail": "Season not found or not tracked."},
+                status=HTTP.NOT_FOUND,
             )
 
         for media in user_medias:
             media.delete()
 
         return Response(
-            status=204,
+            status=HTTP.NO_CONTENT,
         )
 
     def get(self, request, media_type, source, media_id, season_number):
@@ -2050,26 +2048,24 @@ class MediaSeasonDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -2081,14 +2077,17 @@ class MediaSeasonDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not media_metadata:
             return Response(
-                {"detail": get_http_message(404) + " Season not found."},
-                status=404,
+                {"detail": "Season not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         try:
@@ -2101,8 +2100,11 @@ class MediaSeasonDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         season_episodes = list(
@@ -2148,7 +2150,7 @@ class MediaSeasonDetailView(drf_views.APIView):
             data,
             serializer_class=CompleteMediaSerializer,
         )
-        return Response(serialized, status=200)
+        return Response(serialized, status=HTTP.OK)
 
     def patch(self, request, media_type, source, media_id, season_number):
         """Update a tracked season item."""
@@ -2156,26 +2158,24 @@ class MediaSeasonDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         body = request.data or {}
@@ -2190,14 +2190,17 @@ class MediaSeasonDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not user_medias:
             return Response(
-                {"detail": get_http_message(404) + " Season not found or not tracked."},
-                status=404,
+                {"detail": "Season not found or not tracked."},
+                status=HTTP.NOT_FOUND,
             )
 
         media = user_medias[0]
@@ -2206,8 +2209,8 @@ class MediaSeasonDetailView(drf_views.APIView):
 
         if error:
             return Response(
-                {"detail": get_http_message(400) + f" {error}"},
-                status=400,
+                {"detail": f"{error}"},
+                status=HTTP.BAD_REQUEST,
             )
 
         for field, value in validated_body.items():
@@ -2218,8 +2221,8 @@ class MediaSeasonDetailView(drf_views.APIView):
             media.save()
         except Exception:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(400) + " Failed to update season."},
-                status=400,
+                {"detail": "Failed to update season."},
+                status=HTTP.BAD_REQUEST,
             )
 
         media.refresh_from_db()
@@ -2233,8 +2236,11 @@ class MediaSeasonDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         lists = get_item_lists(
@@ -2255,7 +2261,7 @@ class MediaSeasonDetailView(drf_views.APIView):
             data,
             serializer_class=CompleteMediaSerializer,
         )
-        return Response(serialized, status=200)
+        return Response(serialized, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/changes_history/
@@ -2272,26 +2278,24 @@ class MediaSeasonChangesHistoryView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         user_medias = BasicMedia.objects.filter_media(
@@ -2304,8 +2308,8 @@ class MediaSeasonChangesHistoryView(drf_views.APIView):
 
         if not user_medias:
             return Response(
-                {"detail": get_http_message(404) + " Season not found or not tracked."},
-                status=404,
+                {"detail": "Season not found or not tracked."},
+                status=HTTP.NOT_FOUND,
             )
 
         entries = get_changes_history_entries(user_medias, MediaTypes.SEASON.value)
@@ -2322,7 +2326,7 @@ class MediaSeasonChangesHistoryView(drf_views.APIView):
             context={"media_type": MediaTypes.SEASON.value},
             serializer_class=ChangesHistoryEntrySerializer,
         )
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/episodes/
@@ -2340,26 +2344,24 @@ class MediaSeasonEpisodesView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f"  Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f" Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -2372,11 +2374,10 @@ class MediaSeasonEpisodesView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500)
-                    + " Failed to retrieve season episodes.",
+                    "detail": "Failed to retrieve season episodes.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         episodes = []
@@ -2436,7 +2437,7 @@ class MediaSeasonEpisodesView(drf_views.APIView):
             },
             serializer_class=EpisodeSerializer,
         )
-        return Response(paginated, status=200)
+        return Response(paginated, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/
@@ -2454,26 +2455,24 @@ class MediaSeasonConsumptionHistoryView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f"  Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f" Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -2486,8 +2485,11 @@ class MediaSeasonConsumptionHistoryView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         # TODO: missing sorting
@@ -2503,7 +2505,7 @@ class MediaSeasonConsumptionHistoryView(drf_views.APIView):
             many=True,
         )
         paginated_data["results"] = consumptions
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/history/[consumption_id]/  # noqa: E501, W505
@@ -2525,26 +2527,24 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
         """Delete a specific consumption history entry for a specific season."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f"  Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f" Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -2558,48 +2558,45 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500)
-                    + " Failed to retrieve consumption entry.",
+                    "detail": "Failed to retrieve consumption entry.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         consumption = user_medias.filter(id=consumption_id).first()
         if not consumption:
             return Response(
-                {"detail": get_http_message(404) + " Consumption entry not found."},
-                status=404,
+                {"detail": "Consumption entry not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         consumption.delete()
 
-        return Response(status=204)
+        return Response(status=HTTP.NO_CONTENT)
 
     def get(self, request, media_type, source, media_id, season_number, consumption_id):
         """Retrieve a specific consumption history entry for a specific season."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f"  Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f" Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -2612,22 +2609,25 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         consumption = user_medias.filter(id=consumption_id).first()
         if not consumption:
             return Response(
-                {"detail": get_http_message(404) + " Consumption entry not found."},
-                status=404,
+                {"detail": "Consumption entry not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         serialized_data = serialize_data(
             consumption,
             serializer_class=HistorySerializer,
         )
-        return Response(serialized_data, status=200)
+        return Response(serialized_data, status=HTTP.OK)
 
     def patch(
         self,
@@ -2641,26 +2641,24 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
         """Update a specific consumption history entry for a specific season."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f"  Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f" Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -2673,15 +2671,18 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         consumption = user_medias.filter(id=consumption_id).first()
         if not consumption:
             return Response(
-                {"detail": get_http_message(404) + " Consumption entry not found."},
-                status=404,
+                {"detail": "Consumption entry not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         body = request.data or {}
@@ -2690,8 +2691,8 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
 
         if error:
             return Response(
-                {"detail": get_http_message(400), "errors": str(error)},
-                status=400,
+                {"detail": HTTP.BAD_REQUEST.phrase, "errors": str(error)},
+                status=HTTP.BAD_REQUEST,
             )
 
         for field, value in validated_body.items():
@@ -2702,8 +2703,8 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
             consumption.save()
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(400), "errors": str(e)},
-                status=400,
+                {"detail": HTTP.BAD_REQUEST.phrase, "errors": str(e)},
+                status=HTTP.BAD_REQUEST,
             )
 
         consumption.refresh_from_db()
@@ -2712,7 +2713,7 @@ class MediaSeasonConsumptionEntryDetailView(drf_views.APIView):
             consumption,
             serializer_class=HistorySerializer,
         )
-        return Response(serialized_data, status=200)
+        return Response(serialized_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/lists/
@@ -2729,26 +2730,24 @@ class MediaSeasonListsView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f"  Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f" Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         lists = get_item_lists(
@@ -2760,7 +2759,7 @@ class MediaSeasonListsView(drf_views.APIView):
         )
         paginated_data = paginate_data(request, lists, limit, offset)
 
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/lists/[list_id]/
@@ -2773,26 +2772,24 @@ class MediaSeasonListDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f"  Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f" Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -2803,14 +2800,14 @@ class MediaSeasonListDetailView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_edit(user):
             return Response(
-                {"detail": get_http_message(403)},
-                status=403,
+                {"detail": HTTP.FORBIDDEN.phrase},
+                status=HTTP.FORBIDDEN,
             )
 
         try:
@@ -2822,12 +2819,12 @@ class MediaSeasonListDetailView(drf_views.APIView):
             )
         except CustomListItem.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " Media not found in the list."},
-                status=404,
+                {"detail": "Media not found in the list."},
+                status=HTTP.NOT_FOUND,
             )
 
         list_item.delete()
-        return Response(status=204)
+        return Response(status=HTTP.NO_CONTENT)
 
     def put(self, request, media_type, source, media_id, season_number, list_id):
         """Add a specific season to a specific list."""
@@ -2835,26 +2832,24 @@ class MediaSeasonListDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f"  Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f" Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -2865,14 +2860,14 @@ class MediaSeasonListDetailView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_edit(user):
             return Response(
-                {"detail": get_http_message(403)},
-                status=403,
+                {"detail": HTTP.FORBIDDEN.phrase},
+                status=HTTP.FORBIDDEN,
             )
 
         try:
@@ -2884,14 +2879,14 @@ class MediaSeasonListDetailView(drf_views.APIView):
             )
         except Item.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " Media not found."},
-                status=404,
+                {"detail": "Media not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if user_list.items.filter(id=item.id).exists():
             return Response(
-                {"detail": get_http_message(409) + " Media already in the list."},
-                status=409,
+                {"detail": "Media already in the list."},
+                status=HTTP.CONFLICT,
             )
 
         user_list.items.add(item)
@@ -2904,7 +2899,7 @@ class MediaSeasonListDetailView(drf_views.APIView):
             season_number=season_number,
         )
 
-        return Response(lists, status=200)
+        return Response(lists, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/sync/
@@ -2918,32 +2913,30 @@ class MediaSeasonSyncView(drf_views.APIView):
         # TODO: see if it can be simplified reducing the number of return statements
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if source == Sources.MANUAL.value:
             return Response(
-                {"detail": get_http_message(400) + " Manual items cannot be synced."},
-                status=400,
+                {"detail": "Manual items cannot be synced."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f"  Cannot sync `{source}` for `{media_type}` media type",
+                    "detail": f" Cannot sync `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         cache_key = f"{source}_season_{media_id}_{season_number}"
@@ -2952,10 +2945,11 @@ class MediaSeasonSyncView(drf_views.APIView):
         if ttl is not None and ttl > (settings.CACHE_TIMEOUT - 3):
             response = Response(
                 {
-                    "detail": get_http_message(429)
-                    + " The data was recently synced, please wait a few seconds.",
+                    "detail": (
+                        "The data was recently synced, please wait a few seconds."
+                    ),
                 },
-                status=429,
+                status=HTTP.TOO_MANY_REQUESTS,
             )
             response["Retry-After"] = str(ttl)
             return response
@@ -3015,18 +3009,17 @@ class MediaSeasonSyncView(drf_views.APIView):
             item.fetch_releases(delay=False)
 
             return Response(
-                {"detail": get_http_message(202) + " Metadata synced successfully."},
-                status=202,
+                {"detail": "Metadata synced successfully."},
+                status=HTTP.ACCEPTED,
             )
 
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500)
-                    + " An error occurred while syncing metadata.",
+                    "detail": "An error occurred while syncing metadata.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
 
@@ -3051,26 +3044,24 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Episodes are supported only for 'tv' media type.",
+                    "detail": "Episodes are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -3085,27 +3076,25 @@ class MediaEpisodeDetailView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500)
-                    + " An error occurred while fetching media.",
+                    "detail": "An error occurred while fetching media.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not user_medias:
             return Response(
                 {
-                    "detail": get_http_message(404)
-                    + " Episode not found or not tracked.",
+                    "detail": "Episode not found or not tracked.",
                 },
-                status=404,
+                status=HTTP.NOT_FOUND,
             )
 
         for media in user_medias:
             media.delete()
 
         return Response(
-            status=204,
+            status=HTTP.NO_CONTENT,
         )
 
     def get(self, request, media_type, source, media_id, season_number, episode_number):
@@ -3115,26 +3104,24 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Episodes are supported only for 'tv' media type.",
+                    "detail": "Episodes are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -3147,17 +3134,16 @@ class MediaEpisodeDetailView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500)
-                    + " An error occurred while fetching media metadata.",
+                    "detail": "An error occurred while fetching media metadata.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not media_metadata:
             return Response(
-                {"detail": get_http_message(404) + " Episode not found."},
-                status=404,
+                {"detail": "Episode not found."},
+                status=HTTP.NOT_FOUND,
             )
         if "episodes" in media_metadata and media_metadata["episodes"] is not None:
             episode = next(
@@ -3171,8 +3157,8 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
         if not episode:
             return Response(
-                {"detail": get_http_message(404) + " Episode not found."},
-                status=404,
+                {"detail": "Episode not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         try:
@@ -3187,11 +3173,10 @@ class MediaEpisodeDetailView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500)
-                    + " An error occurred while fetching user media.",
+                    "detail": "An error occurred while fetching user media.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         media_metadata.pop("episodes")
@@ -3216,7 +3201,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
             data,
             serializer_class=CompleteEpisodeSerializer,
         )
-        return Response(serialized, status=200)
+        return Response(serialized, status=HTTP.OK)
 
     def patch(
         self,
@@ -3233,26 +3218,24 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Episodes are supported only for 'tv' media type.",
+                    "detail": "Episodes are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         body = request.data or {}
@@ -3269,20 +3252,18 @@ class MediaEpisodeDetailView(drf_views.APIView):
         except Exception as e:  # noqa: BLE001
             return Response(
                 {
-                    "detail": get_http_message(500)
-                    + " An error occurred while fetching user media.",
+                    "detail": "An error occurred while fetching user media.",
                     "errors": str(e),
                 },
-                status=500,
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not user_medias:
             return Response(
                 {
-                    "detail": get_http_message(404)
-                    + " Episode not found or not tracked.",
+                    "detail": "Episode not found or not tracked.",
                 },
-                status=404,
+                status=HTTP.NOT_FOUND,
             )
 
         media = user_medias[0]
@@ -3291,8 +3272,8 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
         if error:
             return Response(
-                {"detail": get_http_message(400), "errors": str(error)},
-                status=400,
+                {"detail": HTTP.BAD_REQUEST.phrase, "errors": str(error)},
+                status=HTTP.BAD_REQUEST,
             )
 
         for field, value in validated_body.items():
@@ -3303,8 +3284,8 @@ class MediaEpisodeDetailView(drf_views.APIView):
             media.save()
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(400), "errors": str(e)},
-                status=400,
+                {"detail": HTTP.BAD_REQUEST.phrase, "errors": str(e)},
+                status=HTTP.BAD_REQUEST,
             )
 
         media.refresh_from_db()
@@ -3318,14 +3299,17 @@ class MediaEpisodeDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         if not media_metadata:
             return Response(
-                {"detail": get_http_message(404) + " Episode not found."},
-                status=404,
+                {"detail": "Episode not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if "episodes" in media_metadata and media_metadata["episodes"] is not None:
@@ -3340,8 +3324,8 @@ class MediaEpisodeDetailView(drf_views.APIView):
 
             if not episode:
                 return Response(
-                    {"detail": get_http_message(404) + " Episode not found."},
-                    status=404,
+                    {"detail": "Episode not found."},
+                    status=HTTP.NOT_FOUND,
                 )
 
         lists = get_item_lists(
@@ -3364,7 +3348,7 @@ class MediaEpisodeDetailView(drf_views.APIView):
             data,
             serializer_class=CompleteEpisodeSerializer,
         )
-        return Response(serialized, status=200)
+        return Response(serialized, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/changes_history/  # noqa: E501, W505
@@ -3381,26 +3365,24 @@ class MediaEpisodeChangesHistoryView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Episodes are supported only for 'tv' media type.",
+                    "detail": "Episodes are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         user_medias = BasicMedia.objects.filter_media(
@@ -3414,11 +3396,8 @@ class MediaEpisodeChangesHistoryView(drf_views.APIView):
 
         if not user_medias:
             return Response(
-                {
-                    "detail": get_http_message(404)
-                    + " Episode not found or not tracked."
-                },
-                status=404,
+                {"detail": "Episode not found or not tracked."},
+                status=HTTP.NOT_FOUND,
             )
 
         entries = get_changes_history_entries(user_medias, MediaTypes.EPISODE.value)
@@ -3435,7 +3414,7 @@ class MediaEpisodeChangesHistoryView(drf_views.APIView):
             context={"request": request, "media_type": MediaTypes.EPISODE.value},
             serializer_class=ChangesHistoryEntrySerializer,
         )
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/  # noqa: E501, W505
@@ -3453,26 +3432,24 @@ class MediaEpisodeConsumptionHistoryView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Episodes are supported only for 'tv' media type.",
+                    "detail": "Episodes are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -3486,8 +3463,11 @@ class MediaEpisodeConsumptionHistoryView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500), "errors": str(e)},
-                status=500,
+                {
+                    "detail": HTTP.INTERNAL_SERVER_ERROR.phrase,
+                    "errors": str(e),
+                },
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         # TODO: missing sorting
@@ -3503,7 +3483,7 @@ class MediaEpisodeConsumptionHistoryView(drf_views.APIView):
             many=True,
         )
         paginated_data["results"] = consumptions
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/history/[consumption_id]/  # noqa: E501, W505
@@ -3526,26 +3506,24 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
         """Delete a specific consumption history entry for a specific episode."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Episodes are supported only for 'tv' media type.",
+                    "detail": "Episodes are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -3559,20 +3537,20 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500) + f" {e!s}"},
-                status=500,
+                {"detail": f"{e!s}"},
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         consumption = user_medias.filter(id=consumption_id).first()
         if not consumption:
             return Response(
-                {"detail": get_http_message(404) + " Consumption entry not found."},
-                status=404,
+                {"detail": "Consumption entry not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         consumption.delete()
 
-        return Response(status=204)
+        return Response(status=HTTP.NO_CONTENT)
 
     def get(
         self,
@@ -3587,26 +3565,24 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
         """Retrieve a specific consumption history entry for a specific episode."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Episodes are supported only for 'tv' media type.",
+                    "detail": "Episodes are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -3620,22 +3596,22 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500) + f" {e!s}"},
-                status=500,
+                {"detail": f"{e!s}"},
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         consumption = user_medias.filter(id=consumption_id).first()
         if not consumption:
             return Response(
-                {"detail": get_http_message(404) + " Consumption entry not found."},
-                status=404,
+                {"detail": "Consumption entry not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         serialized_data = serialize_data(
             consumption,
             serializer_class=HistorySerializer,
         )
-        return Response(serialized_data, status=200)
+        return Response(serialized_data, status=HTTP.OK)
 
     def patch(
         self,
@@ -3650,26 +3626,24 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
         """Update a specific consumption history entry for a specific episode."""
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Episodes are supported only for 'tv' media type.",
+                    "detail": "Episodes are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -3683,15 +3657,15 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
             )
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500) + f" {e!s}"},
-                status=500,
+                {"detail": f"{e!s}"},
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         consumption = user_medias.filter(id=consumption_id).first()
         if not consumption:
             return Response(
-                {"detail": get_http_message(404) + " Consumption entry not found."},
-                status=404,
+                {"detail": "Consumption entry not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         body = request.data or {}
@@ -3700,8 +3674,8 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
 
         if error:
             return Response(
-                {"detail": get_http_message(400) + f" {error}"},
-                status=400,
+                {"detail": f"{error}"},
+                status=HTTP.BAD_REQUEST,
             )
 
         for field, value in validated_body.items():
@@ -3712,8 +3686,8 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
             consumption.save()
         except Exception as e:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(400), "errors": str(e)},
-                status=400,
+                {"detail": HTTP.BAD_REQUEST.phrase, "errors": str(e)},
+                status=HTTP.BAD_REQUEST,
             )
 
         consumption.refresh_from_db()
@@ -3722,7 +3696,7 @@ class MediaEpisodeConsumptionEntryDetailView(drf_views.APIView):
             consumption,
             serializer_class=HistorySerializer,
         )
-        return Response(serialized_data, status=200)
+        return Response(serialized_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/lists/
@@ -3739,26 +3713,24 @@ class MediaEpisodeListsView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + "  Unsupported media type."},
-                status=400,
+                {"detail": " Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         lists = get_item_lists(
@@ -3771,7 +3743,7 @@ class MediaEpisodeListsView(drf_views.APIView):
         )
         paginated_data = paginate_data(request, lists, limit, offset)
 
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/lists/[list_id]/  # noqa: E501, W505
@@ -3793,26 +3765,24 @@ class MediaEpisodeListDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + "  Unsupported media type."},
-                status=400,
+                {"detail": " Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -3823,14 +3793,14 @@ class MediaEpisodeListDetailView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_edit(user):
             return Response(
-                {"detail": get_http_message(403)},
-                status=403,
+                {"detail": HTTP.FORBIDDEN.phrase},
+                status=HTTP.FORBIDDEN,
             )
 
         try:
@@ -3843,12 +3813,12 @@ class MediaEpisodeListDetailView(drf_views.APIView):
             )
         except CustomListItem.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " Media not found in the list."},
-                status=404,
+                {"detail": "Media not found in the list."},
+                status=HTTP.NOT_FOUND,
             )
 
         list_item.delete()
-        return Response(status=204)
+        return Response(status=HTTP.NO_CONTENT)
 
     def put(
         self,
@@ -3865,26 +3835,24 @@ class MediaEpisodeListDetailView(drf_views.APIView):
 
         if not check_valid_type(media_type):
             return Response(
-                {"detail": get_http_message(400) + "  Unsupported media type."},
-                status=400,
+                {"detail": " Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
 
         if media_type != MediaTypes.TV.value:
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + " Seasons are supported only for 'tv' media type.",
+                    "detail": "Seasons are supported only for 'tv' media type.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         if not check_source_type(media_type, source):
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Cannot query `{source}` for `{media_type}` media type",
+                    "detail": f"Cannot query `{source}` for `{media_type}` media type",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         try:
@@ -3895,14 +3863,14 @@ class MediaEpisodeListDetailView(drf_views.APIView):
             )
         except CustomList.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " List not found."},
-                status=404,
+                {"detail": "List not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if not user_list.user_can_edit(user):
             return Response(
-                {"detail": get_http_message(403)},
-                status=403,
+                {"detail": HTTP.FORBIDDEN.phrase},
+                status=HTTP.FORBIDDEN,
             )
 
         try:
@@ -3915,14 +3883,14 @@ class MediaEpisodeListDetailView(drf_views.APIView):
             )
         except Item.DoesNotExist:
             return Response(
-                {"detail": get_http_message(404) + " Media not found."},
-                status=404,
+                {"detail": "Media not found."},
+                status=HTTP.NOT_FOUND,
             )
 
         if user_list.items.filter(id=item.id).exists():
             return Response(
-                {"detail": get_http_message(409) + " Media already in the list."},
-                status=409,
+                {"detail": "Media already in the list."},
+                status=HTTP.CONFLICT,
             )
 
         user_list.items.add(item)
@@ -3936,7 +3904,7 @@ class MediaEpisodeListDetailView(drf_views.APIView):
             episode_number=episode_number,
         )
 
-        return Response(lists, status=200)
+        return Response(lists, status=HTTP.OK)
 
 
 # /api/v1/media/[media_type]/[source]/[media_id]/[season_number]/[episode_number]/sync/
@@ -3982,8 +3950,8 @@ class SearchProviderView(drf_views.APIView):
 
         if not check_valid_type(media_type, complete=True):
             return Response(
-                {"detail": get_http_message(400) + " Unsupported media type."},
-                status=400,
+                {"detail": "Unsupported media type."},
+                status=HTTP.BAD_REQUEST,
             )
         if media_type in ("season", "episode"):
             # Since data of seasons and episodes (title, author, description,
@@ -3991,10 +3959,9 @@ class SearchProviderView(drf_views.APIView):
             # possible to search for them
             return Response(
                 {
-                    "detail": get_http_message(400)
-                    + f" Search for {media_type} is not supported.",
+                    "detail": f"Search for {media_type} is not supported.",
                 },
-                status=400,
+                status=HTTP.BAD_REQUEST,
             )
 
         results_accum = []
@@ -4031,8 +3998,8 @@ class SearchProviderView(drf_views.APIView):
 
         except Exception:  # noqa: BLE001
             return Response(
-                {"detail": get_http_message(500)},
-                status=500,
+                {"detail": HTTP.INTERNAL_SERVER_ERROR.phrase},
+                status=HTTP.INTERNAL_SERVER_ERROR,
             )
 
         total = (
@@ -4049,7 +4016,7 @@ class SearchProviderView(drf_views.APIView):
             offset,
             total=resolved_total,
         )
-        return Response(paginated_data, status=200)
+        return Response(paginated_data, status=HTTP.OK)
 
 
 # /api/v1/statistics/
@@ -4083,8 +4050,8 @@ class StatisticsView(drf_views.APIView):
                 end_date = try_parse_date(end_date)
             except (TypeError, ValueError):
                 return Response(
-                    {"detail": get_http_message(400) + " Invalid date format."},
-                    status=400,
+                    {"detail": "Invalid date format."},
+                    status=HTTP.BAD_REQUEST,
                 )
 
             if start_date and end_date:
@@ -4131,4 +4098,4 @@ class StatisticsView(drf_views.APIView):
             },
         }
 
-        return Response(statistics, status=200)
+        return Response(statistics, status=HTTP.OK)
