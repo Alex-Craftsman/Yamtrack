@@ -1,0 +1,12 @@
+from django.apps import AppConfig
+
+
+class ApiConfig(AppConfig):
+    """Default app config."""
+
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "api"
+
+    def ready(self):
+        """Import signals when the app is ready."""
+        import api.schema  # noqa: F401, PLC0415
