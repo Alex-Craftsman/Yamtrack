@@ -2,16 +2,20 @@ name: build-docs
 on:
   push:
     branches:
+      - dev
       - release
 permissions:
   contents: write
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:  
-          fetch-depth: 0  
+        with:
+          fetch-depth: 0
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
@@ -27,4 +31,8 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - run: pip install -r docs/requirements.txt
-      - run: mkdocs gh-deploy --force
+      - name: Deploy versioned docs
+        run: mike deploy --push ${{ github.ref_name }}
+      - name: Set default docs version
+        if: github.ref_name == 'release'
+        run: mike set-default --push release
