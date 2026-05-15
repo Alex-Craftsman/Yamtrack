@@ -756,14 +756,14 @@
 <ol>
 <li>
 <p><strong>Set Environment Variable</strong>: You need to enable the admin interface by setting the environment variable <code>ADMIN_ENABLED</code> to <code>True</code>. This can be done in your environment configuration file (e.g., <code>.env</code> file) or directly in your <code>docker-compose.yml</code>.</p>
-<p><code>bash
-  ADMIN_ENABLED=True</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">ADMIN_ENABLED</span><span class="o">=</span>True
+</code></pre></div>
 <p>For related settings, see <a href="../env-variables/">env-variables</a>.</p>
 </li>
 <li>
 <p><strong>Access the Admin Page</strong>: Once enabled, you can access the admin interface at the following URL:</p>
-<p><code>bash
-  https://domain.com/admin/</code></p>
+<div class="highlight"><pre><span></span><code>https://domain.com/admin/
+</code></pre></div>
 </li>
 </ol>
 <h2 id="logging-in">Logging In</h2>
@@ -772,26 +772,26 @@
 <ol>
 <li>
 <p><strong>Open Django Shell</strong>: If you are using Docker, you can access the Django shell by running the following command in your terminal:</p>
-<p><code>bash
-  docker exec -it yamtrack python manage.py shell</code></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>yamtrack<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>shell
+</code></pre></div>
 </li>
 <li>
 <p><strong>Set Admin Privileges</strong>: Find the user you want to promote to admin. Replace <code>username</code> with the actual username of the user.</p>
-<p><code>python
-  User.objects.filter(username='username').update(is_staff=True, is_superuser=True)</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s1">&#39;username&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">is_staff</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">is_superuser</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
 </li>
 </ol>
 <h3 id="creating-a-new-admin-user">Creating a New Admin User</h3>
 <ol>
 <li>
 <p><strong>Open Django Shell</strong>: As mentioned above, access the Django shell using Docker:</p>
-<p><code>bash
-  docker exec -it yamtrack python manage.py shell</code></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>yamtrack<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>shell
+</code></pre></div>
 </li>
 <li>
 <p><strong>Create a New User</strong>: Use the following code to create a new user. Replace <code>new_username</code>, <code>new_password</code>, and <code>new_email</code> with the desired values.</p>
-<p><code>python
-  User.objects.create_user(username='new_username', password='new_password', is_staff=True, is_superuser=True)</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create_user</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s1">&#39;new_username&#39;</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="s1">&#39;new_password&#39;</span><span class="p">,</span> <span class="n">is_staff</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">is_superuser</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
 </li>
 <li>
 <p><strong>Log In</strong>: After creating the new user, you can log in to the admin interface using the new credentials.</p>

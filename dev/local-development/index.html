@@ -799,63 +799,63 @@
 <li>Redis</li>
 </ul>
 <h2 id="1-clone-the-repository">1. Clone the repository</h2>
-<p><code>bash
-git clone https://github.com/FuzzyGrim/Yamtrack.git
-cd Yamtrack</code></p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/FuzzyGrim/Yamtrack.git
+<span class="nb">cd</span><span class="w"> </span>Yamtrack
+</code></pre></div>
 <h2 id="2-start-redis">2. Start Redis</h2>
 <p>If you do not already have Redis running locally, start it with Docker:</p>
-<p><code>bash
-docker run -d --name redis -p 6379:6379 --restart unless-stopped redis:8-alpine</code></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>redis<span class="w"> </span>-p<span class="w"> </span><span class="m">6379</span>:6379<span class="w"> </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span>redis:8-alpine
+</code></pre></div>
 <h2 id="3-create-a-virtual-environment">3. Create a virtual environment</h2>
-<p><code>bash
-python -m venv venv
-venv/bin/python -m pip install -U -r requirements-dev.txt
-venv/bin/pre-commit install</code></p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>venv
+venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>-r<span class="w"> </span>requirements-dev.txt
+venv/bin/pre-commit<span class="w"> </span>install
+</code></pre></div>
 <h2 id="4-configure-environment-values">4. Configure environment values</h2>
 <p>Create a <code>.env</code> file in the repository root:</p>
-<p><code>bash
-TMDB_API=API_KEY
-MAL_API=API_KEY
-IGDB_ID=IGDB_ID
-IGDB_SECRET=IGDB_SECRET
-STEAM_API_KEY=STEAM_API_SECRET
-BGG_API_TOKEN=BGG_API_TOKEN
-SECRET=SECRET
-DEBUG=True</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">TMDB_API</span><span class="o">=</span>API_KEY
+<span class="nv">MAL_API</span><span class="o">=</span>API_KEY
+<span class="nv">IGDB_ID</span><span class="o">=</span>IGDB_ID
+<span class="nv">IGDB_SECRET</span><span class="o">=</span>IGDB_SECRET
+<span class="nv">STEAM_API_KEY</span><span class="o">=</span>STEAM_API_SECRET
+<span class="nv">BGG_API_TOKEN</span><span class="o">=</span>BGG_API_TOKEN
+<span class="nv">SECRET</span><span class="o">=</span>SECRET
+<span class="nv">DEBUG</span><span class="o">=</span>True
+</code></pre></div>
 <p>See <a href="../env-variables/">Environment Variables</a> for the full list of supported settings.</p>
 <h2 id="5-prepare-the-database">5. Prepare the database</h2>
-<p><code>bash
-cd src
-../venv/bin/python manage.py migrate</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src
+../venv/bin/python<span class="w"> </span>manage.py<span class="w"> </span>migrate
+</code></pre></div>
 <h2 id="6-run-the-app">6. Run the app</h2>
 <p>Run the Django development server:</p>
-<p><code>bash
-cd src
-../venv/bin/python manage.py runserver</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src
+../venv/bin/python<span class="w"> </span>manage.py<span class="w"> </span>runserver
+</code></pre></div>
 <p>Run the Celery worker with the scheduler in another terminal:</p>
-<p><code>bash
-cd src
-../venv/bin/celery -A config worker --beat --scheduler django --loglevel DEBUG</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src
+../venv/bin/celery<span class="w"> </span>-A<span class="w"> </span>config<span class="w"> </span>worker<span class="w"> </span>--beat<span class="w"> </span>--scheduler<span class="w"> </span>django<span class="w"> </span>--loglevel<span class="w"> </span>DEBUG
+</code></pre></div>
 <p>Run Tailwind in another terminal:</p>
-<p><code>bash
-cd src
-../venv/bin/tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.css --watch</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src
+../venv/bin/tailwindcss<span class="w"> </span>-i<span class="w"> </span>./static/css/input.css<span class="w"> </span>-o<span class="w"> </span>./static/css/tailwind.css<span class="w"> </span>--watch
+</code></pre></div>
 <p>Open the development server at:</p>
-<p><code>text
-http://localhost:8000</code></p>
+<div class="highlight"><pre><span></span><code>http://localhost:8000
+</code></pre></div>
 <h2 id="testing">Testing</h2>
 <p>Run the Django test suite from the <code>src</code> directory:</p>
-<p><code>bash
-cd src
-../venv/bin/python manage.py test --parallel</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src
+../venv/bin/python<span class="w"> </span>manage.py<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--parallel
+</code></pre></div>
 <p>To run tests for a specific app or test module, pass the test label after <code>test</code>:</p>
-<p><code>bash
-cd src
-../venv/bin/python manage.py test app.tests --parallel</code></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src
+../venv/bin/python<span class="w"> </span>manage.py<span class="w"> </span><span class="nb">test</span><span class="w"> </span>app.tests<span class="w"> </span>--parallel
+</code></pre></div>
 <h2 id="documentation">Documentation</h2>
 <p>Install the docs dependencies with the development requirements, then serve the current checkout:</p>
-<p><code>bash
-venv/bin/mkdocs serve --livereload</code></p>
+<div class="highlight"><pre><span></span><code>venv/bin/mkdocs<span class="w"> </span>serve<span class="w"> </span>--livereload
+</code></pre></div>
 
 
 

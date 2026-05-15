@@ -869,19 +869,19 @@
 </ol>
 <h2 id="enabling-social-providers">Enabling Social Providers</h2>
 <p>Use the <code>SOCIAL_PROVIDERS</code> environment variable to specify which providers you want to enable:</p>
-<p><code>bash
-SOCIAL_PROVIDERS=allauth.socialaccount.providers.openid_connect,allauth.socialaccount.providers.github</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">SOCIAL_PROVIDERS</span><span class="o">=</span>allauth.socialaccount.providers.openid_connect,allauth.socialaccount.providers.github
+</code></pre></div>
 <p>This example enables both OpenID Connect and GitHub authentication.</p>
 <h2 id="configuring-providers">Configuring Providers</h2>
 <p>Provider configuration is done through the <code>SOCIALACCOUNT_PROVIDERS</code> environment variable. This should be a JSON string containing all the necessary settings for your providers.</p>
 <h3 id="example-openid-connect-with-authelia">Example: OpenID Connect with Authelia</h3>
-<p><code>bash
-SOCIAL_PROVIDERS=allauth.socialaccount.providers.openid_connect
-SOCIALACCOUNT_PROVIDERS={"openid_connect":{"OAUTH_PKCE_ENABLED":true,"APPS":[{"provider_id":"authelia","name":"Authelia","client_id":"your-client-id","secret":"your-client-secret","settings":{"server_url":"https://authelia.yourdomain.com/.well-known/openid-configuration"}}]}}</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">SOCIAL_PROVIDERS</span><span class="o">=</span>allauth.socialaccount.providers.openid_connect
+<span class="nv">SOCIALACCOUNT_PROVIDERS</span><span class="o">={</span><span class="s2">&quot;openid_connect&quot;</span>:<span class="o">{</span><span class="s2">&quot;OAUTH_PKCE_ENABLED&quot;</span>:true,<span class="s2">&quot;APPS&quot;</span>:<span class="o">[{</span><span class="s2">&quot;provider_id&quot;</span>:<span class="s2">&quot;authelia&quot;</span>,<span class="s2">&quot;name&quot;</span>:<span class="s2">&quot;Authelia&quot;</span>,<span class="s2">&quot;client_id&quot;</span>:<span class="s2">&quot;your-client-id&quot;</span>,<span class="s2">&quot;secret&quot;</span>:<span class="s2">&quot;your-client-secret&quot;</span>,<span class="s2">&quot;settings&quot;</span>:<span class="o">{</span><span class="s2">&quot;server_url&quot;</span>:<span class="s2">&quot;https://authelia.yourdomain.com/.well-known/openid-configuration&quot;</span><span class="o">}}]}}</span>
+</code></pre></div>
 <h3 id="example-github">Example: GitHub</h3>
-<p><code>bash
-SOCIAL_PROVIDERS=allauth.socialaccount.providers.github
-SOCIALACCOUNT_PROVIDERS={"github":{"SCOPE":["user","repo","read:org"]}}</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">SOCIAL_PROVIDERS</span><span class="o">=</span>allauth.socialaccount.providers.github
+<span class="nv">SOCIALACCOUNT_PROVIDERS</span><span class="o">={</span><span class="s2">&quot;github&quot;</span>:<span class="o">{</span><span class="s2">&quot;SCOPE&quot;</span>:<span class="o">[</span><span class="s2">&quot;user&quot;</span>,<span class="s2">&quot;repo&quot;</span>,<span class="s2">&quot;read:org&quot;</span><span class="o">]}}</span>
+</code></pre></div>
 <h2 id="provider-specific-setup">Provider-Specific Setup</h2>
 <h3 id="openid-connect-authelia-authentik-keycloak-etc">OpenID Connect (Authelia, Authentik, Keycloak, etc.)</h3>
 <ol>
@@ -906,9 +906,9 @@ SOCIALACCOUNT_PROVIDERS={"github":{"SCOPE":["user","repo","read:org"]}}</code></
 </li>
 <li>
 <p>In YamTrack, configure:</p>
-<p><code>bash
-SOCIAL_PROVIDERS=allauth.socialaccount.providers.openid_connect
-SOCIALACCOUNT_PROVIDERS={"openid_connect":{"OAUTH_PKCE_ENABLED":true,"APPS":[{"provider_id":"authentik","name":"Authentik","client_id":"&lt;Client ID&gt;","secret":"&lt;Client Secret&gt;","settings":{"server_url":"https://authentik.yourdomain.com/application/o/yamtrack/.well-known/openid-configuration"}}]}}</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">SOCIAL_PROVIDERS</span><span class="o">=</span>allauth.socialaccount.providers.openid_connect
+<span class="nv">SOCIALACCOUNT_PROVIDERS</span><span class="o">={</span><span class="s2">&quot;openid_connect&quot;</span>:<span class="o">{</span><span class="s2">&quot;OAUTH_PKCE_ENABLED&quot;</span>:true,<span class="s2">&quot;APPS&quot;</span>:<span class="o">[{</span><span class="s2">&quot;provider_id&quot;</span>:<span class="s2">&quot;authentik&quot;</span>,<span class="s2">&quot;name&quot;</span>:<span class="s2">&quot;Authentik&quot;</span>,<span class="s2">&quot;client_id&quot;</span>:<span class="s2">&quot;&lt;Client ID&gt;&quot;</span>,<span class="s2">&quot;secret&quot;</span>:<span class="s2">&quot;&lt;Client Secret&gt;&quot;</span>,<span class="s2">&quot;settings&quot;</span>:<span class="o">{</span><span class="s2">&quot;server_url&quot;</span>:<span class="s2">&quot;https://authentik.yourdomain.com/application/o/yamtrack/.well-known/openid-configuration&quot;</span><span class="o">}}]}}</span>
+</code></pre></div>
 </li>
 </ol>
 <h2 id="connecting-social-accounts-to-existing-users">Connecting Social Accounts to Existing Users</h2>
@@ -924,16 +924,16 @@ SOCIALACCOUNT_PROVIDERS={"openid_connect":{"OAUTH_PKCE_ENABLED":true,"APPS":[{"p
 <h2 id="additional-options">Additional Options</h2>
 <h3 id="disable-local-authentication">Disable Local Authentication</h3>
 <p>If you want to use only social authentication and disable the traditional username/password login:</p>
-<p><code>bash
-SOCIALACCOUNT_ONLY=True</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">SOCIALACCOUNT_ONLY</span><span class="o">=</span>True
+</code></pre></div>
 <h3 id="redirect-login-to-sso">Redirect Login to SSO</h3>
 <p>To automatically redirect users from the login page to your SSO provider:</p>
-<p><code>bash
-REDIRECT_LOGIN_TO_SSO=True</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">REDIRECT_LOGIN_TO_SSO</span><span class="o">=</span>True
+</code></pre></div>
 <h3 id="disable-registration">Disable Registration</h3>
 <p>To prevent new users from registering (useful for private instances):</p>
-<p><code>bash
-REGISTRATION=False</code></p>
+<div class="highlight"><pre><span></span><code><span class="nv">REGISTRATION</span><span class="o">=</span>False
+</code></pre></div>
 
 
 

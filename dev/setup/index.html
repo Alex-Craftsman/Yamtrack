@@ -789,50 +789,50 @@
 </ul>
 <h2 id="1-download-a-compose-file">1) Download a Compose file</h2>
 <p>For the default SQLite setup:</p>
-<p><code>bash
-curl -LO https://raw.githubusercontent.com/FuzzyGrim/Yamtrack/release/docker-compose.yml</code></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-LO<span class="w"> </span>https://raw.githubusercontent.com/FuzzyGrim/Yamtrack/release/docker-compose.yml
+</code></pre></div>
 <p>SQLite is enough for most personal installs. It stores the database in the local <code>db</code> directory created beside the Compose file.</p>
 <p>If you prefer PostgreSQL, download the PostgreSQL example instead:</p>
-<p><code>bash
-curl -LO https://raw.githubusercontent.com/FuzzyGrim/Yamtrack/release/docker-compose.postgres.yml</code></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-LO<span class="w"> </span>https://raw.githubusercontent.com/FuzzyGrim/Yamtrack/release/docker-compose.postgres.yml
+</code></pre></div>
 <h2 id="2-update-the-environment-values">2) Update the environment values</h2>
 <p>Open the Compose file and replace the example secret:</p>
-<p><code>yaml
-SECRET=longstring</code></p>
+<div class="highlight"><pre><span></span><code><span class="l l-Scalar l-Scalar-Plain">SECRET=longstring</span>
+</code></pre></div>
 <p>Use a long random value for <code>SECRET</code>. If you are running Yamtrack behind a reverse proxy, also set <code>URLS</code> to the public origin:</p>
-<p><code>yaml
-URLS=https://yamtrack.mydomain.com</code></p>
+<div class="highlight"><pre><span></span><code><span class="l l-Scalar l-Scalar-Plain">URLS=https://yamtrack.mydomain.com</span>
+</code></pre></div>
 <p>The URL must include the protocol (<code>https</code> or <code>http</code>) and should not include a trailing slash or application path. Multiple origins can be separated with commas.</p>
 <p>For the full list of supported settings, see <a href="../env-variables/">Environment Variables</a>.</p>
 <h2 id="3-start-yamtrack">3) Start Yamtrack</h2>
 <p>For SQLite:</p>
-<p><code>bash
-docker compose up -d</code></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
 <p>For PostgreSQL:</p>
-<p><code>bash
-docker compose -f docker-compose.postgres.yml up -d</code></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.postgres.yml<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
 <p>If your system uses the older Compose command, replace <code>docker compose</code> with <code>docker-compose</code>.</p>
 <h2 id="4-open-the-app">4) Open the app</h2>
 <p>Open Yamtrack at:</p>
-<p><code>text
-http://localhost:8000</code></p>
+<div class="highlight"><pre><span></span><code>http://localhost:8000
+</code></pre></div>
 <p>If you changed the port mapping in the Compose file, use the port you configured.</p>
 <h2 id="reverse-proxy-setup">Reverse Proxy Setup</h2>
 <p>When using a reverse proxy, <code>URLS</code> tells Yamtrack which public origins it should trust. This is required for CSRF protection, OAuth redirects, and webhook integrations.</p>
 <p>Example:</p>
-<p><code>yaml
-services:
-  yamtrack:
-    environment:
-      - URLS=https://yamtrack.mydomain.com</code></p>
+<div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">yamtrack</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">URLS=https://yamtrack.mydomain.com</span>
+</code></pre></div>
 <p>If you see <code>403 Forbidden</code> behind a proxy, check that <code>URLS</code> exactly matches the public URL you use in the browser.</p>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <p>Check the Yamtrack container logs:</p>
-<p><code>bash
-docker logs -f yamtrack</code></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>yamtrack
+</code></pre></div>
 <p>Check the Redis container logs:</p>
-<p><code>bash
-docker logs -f yamtrack-redis</code></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>yamtrack-redis
+</code></pre></div>
 
 
 
