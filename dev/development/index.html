@@ -535,10 +535,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#create-a-virtual-environment" class="md-nav__link">
+  <a href="#install-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Create a virtual environment
+        Install dependencies
       </span>
     </span>
   </a>
@@ -752,7 +752,8 @@
 <p>This page covers working on Yamtrack from source.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Python 3.12</li>
+<li><a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a></li>
+<li><a href="https://tailwindcss.com/docs/installation/tailwind-cli">tailwindcss CLI</a> (install with <code>npm install -g tailwindcss @tailwindcss/cli</code>)</li>
 <li>Docker</li>
 <li>Redis</li>
 </ul>
@@ -765,13 +766,13 @@
 <p>If you do not already have Redis running locally, start it with Docker:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>redis<span class="w"> </span>-p<span class="w"> </span><span class="m">6379</span>:6379<span class="w"> </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span>redis:8-alpine
 </span></code></pre></div>
-<h3 id="create-a-virtual-environment">Create a virtual environment<a class="headerlink" href="#create-a-virtual-environment" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>venv
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>-r<span class="w"> </span>requirements-dev.txt
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>venv/bin/pre-commit<span class="w"> </span>install
+<h3 id="install-dependencies">Install dependencies<a class="headerlink" href="#install-dependencies" title="Permanent link">&para;</a></h3>
+<p>uv manages the Python environment and dependencies:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>sync
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>uv<span class="w"> </span>run<span class="w"> </span>pre-commit<span class="w"> </span>install
 </span></code></pre></div>
-<p>Installing the development requirements includes pre-commit. After <code>venv/bin/pre-commit install</code>, the hooks run automatically before each commit. You can also run the full hook set manually:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>venv/bin/pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files
+<p>Installing the development dependencies includes pre-commit. After <code>uv run pre-commit install</code>, the hooks run automatically before each commit. You can also run the full hook set manually:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files
 </span></code></pre></div>
 <h3 id="configure-environment-values">Configure environment values<a class="headerlink" href="#configure-environment-values" title="Permanent link">&para;</a></h3>
 <p>Create a <code>.env</code> file in the repository root:</p>
@@ -787,36 +788,37 @@
 <p>See <a href="../env-variables/">Environment Variables</a> for the full list of supported settings.</p>
 <h3 id="prepare-the-database">Prepare the database<a class="headerlink" href="#prepare-the-database" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">cd</span><span class="w"> </span>src
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>../venv/bin/python<span class="w"> </span>manage.py<span class="w"> </span>migrate
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>uv<span class="w"> </span>run<span class="w"> </span>manage.py<span class="w"> </span>migrate
 </span></code></pre></div>
 <h3 id="run-the-app">Run the app<a class="headerlink" href="#run-the-app" title="Permanent link">&para;</a></h3>
 <p>Run the Django development server:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">cd</span><span class="w"> </span>src
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>../venv/bin/python<span class="w"> </span>manage.py<span class="w"> </span>runserver
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>uv<span class="w"> </span>run<span class="w"> </span>manage.py<span class="w"> </span>runserver
 </span></code></pre></div>
 <p>Run the Celery worker with the scheduler in another terminal:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">cd</span><span class="w"> </span>src
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>../venv/bin/celery<span class="w"> </span>-A<span class="w"> </span>config<span class="w"> </span>worker<span class="w"> </span>--beat<span class="w"> </span>--scheduler<span class="w"> </span>django<span class="w"> </span>--loglevel<span class="w"> </span>DEBUG
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>uv<span class="w"> </span>run<span class="w"> </span>celery<span class="w"> </span>-A<span class="w"> </span>config<span class="w"> </span>worker<span class="w"> </span>--beat<span class="w"> </span>--scheduler<span class="w"> </span>django<span class="w"> </span>--loglevel<span class="w"> </span>DEBUG
 </span></code></pre></div>
 <p>Run Tailwind in another terminal:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nb">cd</span><span class="w"> </span>src
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>../venv/bin/tailwindcss<span class="w"> </span>-i<span class="w"> </span>./static/css/input.css<span class="w"> </span>-o<span class="w"> </span>./static/css/tailwind.css<span class="w"> </span>--watch
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>tailwindcss<span class="w"> </span>-i<span class="w"> </span>./static/css/input.css<span class="w"> </span>-o<span class="w"> </span>./static/css/tailwind.css<span class="w"> </span>--watch
 </span></code></pre></div>
 <p>Open the development server at:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>http://localhost:8000
 </span></code></pre></div>
 <h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
-<p>Install the docs dependencies from <code>docs/requirements.txt</code>, then serve the current checkout:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>venv/bin/zensical<span class="w"> </span>serve
+<p>Install the docs dependency group, then serve the docs from the current checkout:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--group<span class="w"> </span>docs
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>uv<span class="w"> </span>run<span class="w"> </span>zensical<span class="w"> </span>serve
 </span></code></pre></div>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <p>Run the Django test suite from the <code>src</code> directory:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">cd</span><span class="w"> </span>src
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>../venv/bin/python<span class="w"> </span>manage.py<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--parallel
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>uv<span class="w"> </span>run<span class="w"> </span>manage.py<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--parallel
 </span></code></pre></div>
 <p>To run tests for a specific app or test module, pass the test label after <code>test</code>:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nb">cd</span><span class="w"> </span>src
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>../venv/bin/python<span class="w"> </span>manage.py<span class="w"> </span><span class="nb">test</span><span class="w"> </span>app.tests<span class="w"> </span>--parallel
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>uv<span class="w"> </span>run<span class="w"> </span>manage.py<span class="w"> </span><span class="nb">test</span><span class="w"> </span>app.tests<span class="w"> </span>--parallel
 </span></code></pre></div>
 
 
