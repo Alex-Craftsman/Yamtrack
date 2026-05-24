@@ -24,8 +24,8 @@ jobs:
 
           stale-issue-label: stale
           stale-pr-label: stale
-          exempt-issue-labels: pinned,security,roadmap,blocked,never stale
-          exempt-pr-labels: pinned,security,blocked,never stale
+          exempt-issue-labels: pinned,security,roadmap,blocked,never stale,pending answer
+          exempt-pr-labels: pinned,security,blocked,never stale,pending answer
           exempt-draft-pr: true
 
           stale-issue-message: >
@@ -38,12 +38,34 @@ jobs:
             is no further activity.
           close-issue-message: >
             This issue was closed because it remained inactive after being
-            marked stale. Feel free to reopen it or open a new issue if this
+            marked stale. Feel free to open a new issue if this
             is still relevant.
           close-pr-message: >
             This pull request was closed because it remained inactive after
-            being marked stale. Feel free to reopen it or open a new pull
+            being marked stale. Feel free to open a new pull
             request if you want to continue the work.
+
+          remove-stale-when-updated: true
+          operations-per-run: 30
+
+      - name: Close issues and pull requests pending an answer
+        uses: actions/stale@v10
+        with:
+          days-before-stale: -1
+          days-before-close: 15
+
+          stale-issue-label: pending answer
+          stale-pr-label: pending answer
+          only-labels: pending answer
+
+          close-issue-message: >
+            This issue was closed because it was waiting for more information
+            for 15 days without a response. Feel free to open a
+            new issue if you can provide the requested details.
+          close-pr-message: >
+            This pull request was closed because it was waiting for more
+            information for 15 days without a response. Feel free to 
+            open a new pull request if you want to continue the work.
 
           remove-stale-when-updated: true
           operations-per-run: 30
