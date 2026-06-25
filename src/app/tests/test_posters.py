@@ -81,11 +81,17 @@ class PosterCacheTests(SimpleTestCase):
             "poster.jpg",
         )
 
+    @patch("app.posters.threading.Thread")
     @patch("app.posters.refresh_poster_safely")
     def test_refresh_poster_in_background_starts_download_when_slot_is_free(
         self,
         mock_refresh,
+        mock_thread,
     ):
+        mock_thread.return_value.start.side_effect = lambda: mock_thread.call_args.kwargs[
+            "target"
+        ]()
+
         posters.refresh_poster_in_background(
             Sources.MAL.value,
             "cache-key",
