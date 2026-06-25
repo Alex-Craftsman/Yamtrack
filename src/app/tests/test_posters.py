@@ -62,44 +62,70 @@ class PosterCacheTests(SimpleTestCase):
             f"/poster/{Sources.MANUAL.value}/{cache_key}/poster.jpg",
         )
 
-    @patch("app.posters.requests.get")
-    def test_poster_streams_and_caches_missing_file(self, mock_get):
-        image_url = "https://example.com/images/poster.jpg"
-        url = posters.get_poster_url(Sources.MAL.value, image_url)
-        cache_key = posters.get_cache_key(image_url)
-        mock_get.return_value = self.mock_image_response()
-
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(b"".join(response.streaming_content), b"image-bytes")
-        self.assertTrue(
-            posters.get_poster_path(
-                Sources.MAL.value,
-                cache_key,
-                "poster.jpg",
-            ).exists(),
-        )
-        mock_get.assert_called_once_with(image_url, timeout=120, stream=True)
-
-    @patch("app.posters.requests.get")
-    def test_poster_redirects_to_external_url_when_download_limit_is_full(
+    @patch("app.posters.refresh_poster_in_background")
+    def test_poster_redirects_and_caches_missing_file_in_background(
         self,
-        mock_get,
+        mock_refresh,
     ):
         image_url = "https://example.com/images/poster.jpg"
         url = posters.get_poster_url(Sources.MAL.value, image_url)
+        cache_key = posters.get_cache_key(image_url)
 
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], image_url)
+        mock_refresh.assert_called_once_with(
+            Sources.MAL.value,
+            cache_key,
+            "poster.jpg",
+        )
+
+    @patch("app.posters.refresh_poster_safely")
+    def test_refresh_poster_in_background_starts_download_when_slot_is_free(
+        self,
+        mock_refresh,
+    ):
+        posters.refresh_poster_in_background(
+            Sources.MAL.value,
+            "cache-key",
+            "poster.jpg",
+        )
+
+        self.assertEqual(mock_refresh.call_count, 1)
+        _, kwargs = mock_refresh.call_args
+        self.assertIsNotNone(kwargs["semaphore"])
+
+    @patch("app.posters.refresh_poster_safely")
+    def test_refresh_poster_in_background_skips_when_limit_is_full(
+        self,
+        mock_refresh,
+    ):
         with self.settings(POSTER_CACHE_MAX_CONCURRENT_DOWNLOADS=1):
             semaphore = posters.get_download_semaphore()
             self.assertTrue(semaphore.acquire(blocking=False))
             self.addCleanup(semaphore.release)
 
-            response = self.client.get(url)
+            posters.refresh_poster_in_background(
+                Sources.MAL.value,
+                "cache-key",
+                "poster.jpg",
+            )
+
+        mock_refresh.assert_not_called()
+
+    @patch("app.posters.refresh_poster_in_background")
+    def test_poster_redirects_to_external_url_when_download_limit_is_full(
+        self,
+        mock_refresh,
+    ):
+        image_url = "https://example.com/images/poster.jpg"
+        url = posters.get_poster_url(Sources.MAL.value, image_url)
+        response = self.client.get(url)
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], image_url)
-        mock_get.assert_not_called()
+        mock_refresh.assert_called_once()
 
     @patch("app.posters.requests.get")
     def test_poster_serves_fresh_cached_file_without_external_request(self, mock_get):
