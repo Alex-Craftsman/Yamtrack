@@ -27,7 +27,11 @@ class PosterCacheTests(SimpleTestCase):
     def mock_image_response(self, content=b"image-bytes"):
         response = Mock()
         response.content = content
-        response.headers = {"Content-Type": "image/jpeg"}
+        response.headers = {
+            "Content-Type": "image/jpeg",
+            "Content-Length": str(len(content)),
+        }
+        response.iter_content.return_value = [content]
         response.raise_for_status.return_value = None
         return response
 
@@ -58,7 +62,7 @@ class PosterCacheTests(SimpleTestCase):
         )
 
     @patch("app.posters.requests.get")
-    def test_poster_downloads_and_serves_missing_file(self, mock_get):
+    def test_poster_streams_and_caches_missing_file(self, mock_get):
         image_url = "https://example.com/images/poster.jpg"
         url = posters.get_poster_url(Sources.MAL.value, image_url)
         cache_key = posters.get_cache_key(image_url)
@@ -75,7 +79,7 @@ class PosterCacheTests(SimpleTestCase):
                 "poster.jpg",
             ).exists(),
         )
-        mock_get.assert_called_once_with(image_url, timeout=120)
+        mock_get.assert_called_once_with(image_url, timeout=120, stream=True)
 
     @patch("app.posters.requests.get")
     def test_poster_serves_fresh_cached_file_without_external_request(self, mock_get):
@@ -91,6 +95,19 @@ class PosterCacheTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(b"".join(response.streaming_content), b"cached-image")
         mock_get.assert_not_called()
+
+    @patch("app.posters.requests.get")
+    def test_refresh_poster_downloads_and_caches_file(self, mock_get):
+        image_url = "https://example.com/images/poster.jpg"
+        cache_key = posters.get_cache_key(image_url)
+        posters.get_poster_url(Sources.MAL.value, image_url)
+        mock_get.return_value = self.mock_image_response(b"refreshed-image")
+
+        path = posters.refresh_poster(Sources.MAL.value, cache_key, "poster.jpg")
+
+        self.assertEqual(path.read_bytes(), b"refreshed-image")
+        mock_get.assert_called_once_with(image_url, timeout=120, stream=True)
+        mock_get.return_value.close.assert_called_once()
 
     @patch("app.posters.refresh_poster_in_background")
     def test_poster_serves_stale_file_and_refreshes_in_background(self, mock_refresh):

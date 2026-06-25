@@ -15,6 +15,33 @@ COPY ./uv.lock ./uv.lock
 
 RUN uv sync --locked
 
+# --- Test stage: build the virtualenv with test/dev dependencies ---
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS test-builder
+
+# Enable bytecode compilation
+ENV UV_COMPILE_BYTECODE=1
+# Copy from cache instead of symlinking (cache is discarded with the builder)
+ENV UV_LINK_MODE=copy
+
+WORKDIR /yamtrack
+
+COPY ./pyproject.toml ./pyproject.toml
+COPY ./uv.lock ./uv.lock
+
+RUN uv sync --locked --group dev
+
+FROM python:3.12-slim AS test
+
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/yamtrack/.venv/bin:$PATH"
+
+WORKDIR /yamtrack
+
+COPY --from=test-builder /yamtrack/.venv /yamtrack/.venv
+COPY src ./
+
+CMD ["python", "manage.py", "test", "--parallel"]
+
 # --- Final stage: minimal runtime image ---
 FROM python:3.12-alpine3.23
 

@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import requests
 from django.conf import settings
 from django.contrib.auth.decorators import login_not_required
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, StreamingHttpResponse
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 
@@ -96,23 +96,57 @@ def is_cache_fresh(path):
 def refresh_poster(source, cache_key, filename):
     """Download a poster and atomically save it to the local cache."""
     path = get_poster_path(source, cache_key, filename)
-    metadata = read_metadata(source, cache_key)
-    url = metadata["url"]
+    response = get_external_poster_response(source, cache_key)
 
-    response = requests.get(url, timeout=settings.REQUEST_TIMEOUT)
-    response.raise_for_status()
-
-    content_type = response.headers.get("Content-Type", "")
-    if not content_type.startswith("image/"):
-        msg = f"Unexpected poster content type: {content_type}"
-        raise ValueError(msg)
+    try:
+        content = response.content
+    finally:
+        response.close()
 
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_suffix(f"{path.suffix}.tmp")
     with temp_path.open("wb") as file:
-        file.write(response.content)
+        file.write(content)
     temp_path.replace(path)
     return path
+
+
+def get_external_poster_response(source, cache_key):
+    """Open a streaming response for an external poster."""
+    metadata = read_metadata(source, cache_key)
+    url = metadata["url"]
+
+    response = requests.get(url, timeout=settings.REQUEST_TIMEOUT, stream=True)
+    response.raise_for_status()
+
+    content_type = response.headers.get("Content-Type", "")
+    if not content_type.startswith("image/"):
+        response.close()
+        msg = f"Unexpected poster content type: {content_type}"
+        raise ValueError(msg)
+
+    return response
+
+
+def stream_and_cache_poster(response, path):
+    """Yield external poster chunks while atomically writing them to cache."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_suffix(f"{path.suffix}.tmp")
+    complete = False
+
+    try:
+        with temp_path.open("wb") as file:
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if not chunk:
+                    continue
+                file.write(chunk)
+                yield chunk
+        temp_path.replace(path)
+        complete = True
+    finally:
+        response.close()
+        if not complete:
+            temp_path.unlink(missing_ok=True)
 
 
 def refresh_poster_safely(source, cache_key, filename):
@@ -165,7 +199,7 @@ def poster(request, source, cache_key, filename):  # noqa: ARG001
         return FileResponse(path.open("rb"), content_type=content_type)
 
     try:
-        path = refresh_poster(source, cache_key, filename)
+        external_response = get_external_poster_response(source, cache_key)
     except (
         OSError,
         requests.RequestException,
@@ -176,5 +210,10 @@ def poster(request, source, cache_key, filename):  # noqa: ARG001
         msg = "Poster not found"
         raise Http404(msg) from error
 
-    content_type, _ = mimetypes.guess_type(path)
-    return FileResponse(path.open("rb"), content_type=content_type)
+    response = StreamingHttpResponse(
+        stream_and_cache_poster(external_response, path),
+        content_type=external_response.headers.get("Content-Type"),
+    )
+    if content_length := external_response.headers.get("Content-Length"):
+        response["Content-Length"] = content_length
+    return response

@@ -118,6 +118,18 @@ cd src
 uv run manage.py test --parallel
 ```
 
+Or run the full suite in Docker with all test dependencies:
+
+```bash
+make docker-test
+```
+
+To run a specific test label in Docker:
+
+```bash
+make docker-test TEST_ARGS=app.tests.test_posters
+```
+
 To run tests for a specific app or test module, pass the test label after `test`:
 
 ```bash
