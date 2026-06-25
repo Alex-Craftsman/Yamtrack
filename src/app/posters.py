@@ -11,7 +11,12 @@ from urllib.parse import urlparse
 import requests
 from django.conf import settings
 from django.contrib.auth.decorators import login_not_required
-from django.http import FileResponse, Http404, StreamingHttpResponse
+from django.http import (
+    FileResponse,
+    Http404,
+    HttpResponseRedirect,
+    StreamingHttpResponse,
+)
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 
@@ -19,6 +24,17 @@ logger = logging.getLogger(__name__)
 
 _refreshing_posters = set()
 _refresh_lock = threading.Lock()
+_download_semaphore = None
+_download_semaphore_limit = None
+_download_semaphore_lock = threading.Lock()
+
+
+class PosterDownloadSlotsFull(Exception):
+    """Raised when all external poster download slots are busy."""
+
+    def __init__(self, url):
+        self.url = url
+        super().__init__("All poster download slots are busy")
 
 
 def get_poster_url(source, image_url):
@@ -78,6 +94,12 @@ def read_metadata(source, cache_key):
         return json.load(file)
 
 
+def get_external_poster_url(source, cache_key):
+    """Return the original external URL for a cached poster key."""
+    metadata = read_metadata(source, cache_key)
+    return metadata["url"]
+
+
 def get_poster_path(source, cache_key, filename):
     """Return the local filesystem path for a poster."""
     safe_filename = Path(filename).name
@@ -93,6 +115,29 @@ def is_cache_fresh(path):
     return age < settings.POSTER_CACHE_TIMEOUT
 
 
+def get_download_semaphore():
+    """Return a process-local semaphore for external poster downloads."""
+    global _download_semaphore, _download_semaphore_limit  # noqa: PLW0603
+
+    limit = max(1, settings.POSTER_CACHE_MAX_CONCURRENT_DOWNLOADS)
+    with _download_semaphore_lock:
+        if _download_semaphore is None or _download_semaphore_limit != limit:
+            _download_semaphore = threading.BoundedSemaphore(limit)
+            _download_semaphore_limit = limit
+        return _download_semaphore
+
+
+def close_external_poster_response(response):
+    """Close an external poster response and release its download slot."""
+    try:
+        response.close()
+    finally:
+        semaphore = getattr(response, "_poster_download_semaphore", None)
+        if semaphore is not None:
+            delattr(response, "_poster_download_semaphore")
+            semaphore.release()
+
+
 def refresh_poster(source, cache_key, filename):
     """Download a poster and atomically save it to the local cache."""
     path = get_poster_path(source, cache_key, filename)
@@ -101,7 +146,7 @@ def refresh_poster(source, cache_key, filename):
     try:
         content = response.content
     finally:
-        response.close()
+        close_external_poster_response(response)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_suffix(f"{path.suffix}.tmp")
@@ -113,17 +158,27 @@ def refresh_poster(source, cache_key, filename):
 
 def get_external_poster_response(source, cache_key):
     """Open a streaming response for an external poster."""
-    metadata = read_metadata(source, cache_key)
-    url = metadata["url"]
+    url = get_external_poster_url(source, cache_key)
+    semaphore = get_download_semaphore()
+    if not semaphore.acquire(blocking=False):
+        raise PosterDownloadSlotsFull(url)
 
-    response = requests.get(url, timeout=settings.REQUEST_TIMEOUT, stream=True)
-    response.raise_for_status()
+    response = None
+    try:
+        response = requests.get(url, timeout=settings.REQUEST_TIMEOUT, stream=True)
+        response._poster_download_semaphore = semaphore
+        response.raise_for_status()
 
-    content_type = response.headers.get("Content-Type", "")
-    if not content_type.startswith("image/"):
-        response.close()
-        msg = f"Unexpected poster content type: {content_type}"
-        raise ValueError(msg)
+        content_type = response.headers.get("Content-Type", "")
+        if not content_type.startswith("image/"):
+            msg = f"Unexpected poster content type: {content_type}"
+            raise ValueError(msg)
+    except Exception:
+        if response is None:
+            semaphore.release()
+        else:
+            close_external_poster_response(response)
+        raise
 
     return response
 
@@ -144,7 +199,7 @@ def stream_and_cache_poster(response, path):
         temp_path.replace(path)
         complete = True
     finally:
-        response.close()
+        close_external_poster_response(response)
         if not complete:
             temp_path.unlink(missing_ok=True)
 
@@ -153,6 +208,8 @@ def refresh_poster_safely(source, cache_key, filename):
     """Refresh a poster and log failures without breaking the caller."""
     try:
         refresh_poster(source, cache_key, filename)
+    except PosterDownloadSlotsFull:
+        return
     except (
         OSError,
         requests.RequestException,
@@ -200,6 +257,8 @@ def poster(request, source, cache_key, filename):  # noqa: ARG001
 
     try:
         external_response = get_external_poster_response(source, cache_key)
+    except PosterDownloadSlotsFull as error:
+        return HttpResponseRedirect(error.url)
     except (
         OSError,
         requests.RequestException,

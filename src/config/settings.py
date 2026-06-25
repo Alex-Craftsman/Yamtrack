@@ -349,6 +349,11 @@ POSTER_CACHE_DIR = Path(config("POSTER_CACHE_DIR", default=BASE_DIR.parent / "po
 POSTER_CACHE_TIMEOUT = (
     config("POSTER_CACHE_TIMEOUT_HOURS", default=48, cast=int) * 60 * 60
 )
+POSTER_CACHE_MAX_CONCURRENT_DOWNLOADS = config(
+    "POSTER_CACHE_MAX_CONCURRENT_DOWNLOADS",
+    default=5,
+    cast=int,
+)
 
 TMDB_API = config(
     "TMDB_API",

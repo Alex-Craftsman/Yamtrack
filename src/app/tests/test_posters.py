@@ -20,6 +20,7 @@ class PosterCacheTests(SimpleTestCase):
         self.override = override_settings(
             POSTER_CACHE_DIR=Path(self.temp_dir.name),
             POSTER_CACHE_TIMEOUT=48 * 60 * 60,
+            POSTER_CACHE_MAX_CONCURRENT_DOWNLOADS=5,
         )
         self.override.enable()
         self.addCleanup(self.override.disable)
@@ -80,6 +81,25 @@ class PosterCacheTests(SimpleTestCase):
             ).exists(),
         )
         mock_get.assert_called_once_with(image_url, timeout=120, stream=True)
+
+    @patch("app.posters.requests.get")
+    def test_poster_redirects_to_external_url_when_download_limit_is_full(
+        self,
+        mock_get,
+    ):
+        image_url = "https://example.com/images/poster.jpg"
+        url = posters.get_poster_url(Sources.MAL.value, image_url)
+
+        with self.settings(POSTER_CACHE_MAX_CONCURRENT_DOWNLOADS=1):
+            semaphore = posters.get_download_semaphore()
+            self.assertTrue(semaphore.acquire(blocking=False))
+            self.addCleanup(semaphore.release)
+
+            response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], image_url)
+        mock_get.assert_not_called()
 
     @patch("app.posters.requests.get")
     def test_poster_serves_fresh_cached_file_without_external_request(self, mock_get):
