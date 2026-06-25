@@ -15,7 +15,6 @@ from django.http import (
     FileResponse,
     Http404,
     HttpResponseRedirect,
-    StreamingHttpResponse,
 )
 from django.urls import reverse
 from django.views.decorators.http import require_GET
@@ -138,10 +137,10 @@ def close_external_poster_response(response):
             semaphore.release()
 
 
-def refresh_poster(source, cache_key, filename):
+def refresh_poster(source, cache_key, filename, semaphore=None):
     """Download a poster and atomically save it to the local cache."""
     path = get_poster_path(source, cache_key, filename)
-    response = get_external_poster_response(source, cache_key)
+    response = get_external_poster_response(source, cache_key, semaphore=semaphore)
 
     try:
         content = response.content
@@ -156,11 +155,16 @@ def refresh_poster(source, cache_key, filename):
     return path
 
 
-def get_external_poster_response(source, cache_key):
+def get_external_poster_response(source, cache_key, semaphore=None):
     """Open a streaming response for an external poster."""
     url = get_external_poster_url(source, cache_key)
-    semaphore = get_download_semaphore()
-    if not semaphore.acquire(blocking=False):
+    if semaphore is None:
+        semaphore = get_download_semaphore()
+        acquired = semaphore.acquire(blocking=False)
+    else:
+        acquired = True
+
+    if not acquired:
         raise PosterDownloadSlotsFull(url)
 
     response = None
@@ -183,31 +187,10 @@ def get_external_poster_response(source, cache_key):
     return response
 
 
-def stream_and_cache_poster(response, path):
-    """Yield external poster chunks while atomically writing them to cache."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_suffix(f"{path.suffix}.tmp")
-    complete = False
-
-    try:
-        with temp_path.open("wb") as file:
-            for chunk in response.iter_content(chunk_size=64 * 1024):
-                if not chunk:
-                    continue
-                file.write(chunk)
-                yield chunk
-        temp_path.replace(path)
-        complete = True
-    finally:
-        close_external_poster_response(response)
-        if not complete:
-            temp_path.unlink(missing_ok=True)
-
-
-def refresh_poster_safely(source, cache_key, filename):
+def refresh_poster_safely(source, cache_key, filename, semaphore=None):
     """Refresh a poster and log failures without breaking the caller."""
     try:
-        refresh_poster(source, cache_key, filename)
+        refresh_poster(source, cache_key, filename, semaphore=semaphore)
     except PosterDownloadSlotsFull:
         return
     except (
@@ -233,9 +216,15 @@ def refresh_poster_in_background(source, cache_key, filename):
             return
         _refreshing_posters.add(key)
 
+    semaphore = get_download_semaphore()
+    if not semaphore.acquire(blocking=False):
+        with _refresh_lock:
+            _refreshing_posters.discard(key)
+        return
+
     def refresh():
         try:
-            refresh_poster_safely(source, cache_key, filename)
+            refresh_poster_safely(source, cache_key, filename, semaphore=semaphore)
         finally:
             with _refresh_lock:
                 _refreshing_posters.discard(key)
@@ -256,23 +245,10 @@ def poster(request, source, cache_key, filename):  # noqa: ARG001
         return FileResponse(path.open("rb"), content_type=content_type)
 
     try:
-        external_response = get_external_poster_response(source, cache_key)
-    except PosterDownloadSlotsFull as error:
-        return HttpResponseRedirect(error.url)
-    except (
-        OSError,
-        requests.RequestException,
-        ValueError,
-        KeyError,
-        json.JSONDecodeError,
-    ) as error:
+        external_url = get_external_poster_url(source, cache_key)
+    except (OSError, KeyError, json.JSONDecodeError) as error:
         msg = "Poster not found"
         raise Http404(msg) from error
 
-    response = StreamingHttpResponse(
-        stream_and_cache_poster(external_response, path),
-        content_type=external_response.headers.get("Content-Type"),
-    )
-    if content_length := external_response.headers.get("Content-Length"):
-        response["Content-Length"] = content_length
-    return response
+    refresh_poster_in_background(source, cache_key, filename)
+    return HttpResponseRedirect(external_url)
