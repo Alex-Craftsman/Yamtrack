@@ -88,9 +88,10 @@ class PosterCacheTests(SimpleTestCase):
         mock_refresh,
         mock_thread,
     ):
-        mock_thread.return_value.start.side_effect = lambda: mock_thread.call_args.kwargs[
-            "target"
-        ]()
+        def run_thread_target():
+            mock_thread.call_args.kwargs["target"]()
+
+        mock_thread.return_value.start.side_effect = run_thread_target
 
         posters.refresh_poster_in_background(
             Sources.MAL.value,
