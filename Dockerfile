@@ -42,7 +42,8 @@ RUN apk add --no-cache nginx shadow \
     && useradd -U -M -s /bin/sh abc \
     # Create required nginx directories and set permissions
     && mkdir -p /var/log/nginx \
-    && mkdir -p /var/lib/nginx/body
+    && mkdir -p /var/lib/nginx/body \
+    && mkdir -p /poster
 
 # Copy the pre-built virtualenv from the builder stage
 COPY --from=builder /yamtrack/.venv /yamtrack/.venv

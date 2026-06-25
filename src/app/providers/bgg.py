@@ -10,7 +10,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 
-from app import helpers
+from app import helpers, posters
 from app.models import MediaTypes, Sources
 from app.providers import services
 
@@ -126,11 +126,17 @@ def _fetch_thumbnails(game_ids):
             game_id = item.get("id")
             thumbnail_elem = item.find("thumbnail")
             if thumbnail_elem is not None and thumbnail_elem.text:
-                thumbnails[game_id] = thumbnail_elem.text
+                thumbnails[game_id] = posters.get_poster_url(
+                    Sources.BGG.value,
+                    thumbnail_elem.text,
+                )
             else:
                 image_elem = item.find("image")
                 if image_elem is not None and image_elem.text:
-                    thumbnails[game_id] = image_elem.text
+                    thumbnails[game_id] = posters.get_poster_url(
+                        Sources.BGG.value,
+                        image_elem.text,
+                    )
     except (requests.exceptions.HTTPError, services.ProviderAPIError):
         logger.exception("Failed to fetch thumbnails from BGG")
         return {}
@@ -197,7 +203,7 @@ def get_image(item):
     """Return the image URL."""
     image_elem = item.find("image")
     if image_elem is not None and image_elem.text:
-        return image_elem.text
+        return posters.get_poster_url(Sources.BGG.value, image_elem.text)
     return settings.IMG_NONE
 
 

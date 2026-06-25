@@ -4,7 +4,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 
-from app import helpers
+from app import helpers, posters
 from app.models import MediaTypes, Sources
 from app.providers import services
 
@@ -180,7 +180,14 @@ def book(media_id):
             "media_type": MediaTypes.BOOK.value,
             "title": book_data["title"],
             "max_progress": book_data.get("pages"),
-            "image": book_data.get("cached_image") or settings.IMG_NONE,
+            "image": (
+                posters.get_poster_url(
+                    Sources.HARDCOVER.value,
+                    book_data.get("cached_image"),
+                )
+                if book_data.get("cached_image")
+                else settings.IMG_NONE
+            ),
             "synopsis": book_data.get("description") or "No synopsis available.",
             "genres": get_tags(book_data.get("cached_tags")),
             "score": get_ratings(book_data.get("rating")),
@@ -241,5 +248,8 @@ def get_edition_details(edition_data):
 def get_image_url(response):
     """Get the cover image URL for a book."""
     if response.get("image") and response["image"].get("url"):
-        return response["image"]["url"]
+        return posters.get_poster_url(
+            Sources.HARDCOVER.value,
+            response["image"]["url"],
+        )
     return settings.IMG_NONE

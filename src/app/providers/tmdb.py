@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 
-from app import helpers
+from app import helpers, posters
 from app.models import MediaTypes, Sources
 from app.providers import services
 
@@ -511,7 +511,8 @@ def get_image_url(path):
     # when no image, value from response is null
     # e.g movie: 445290
     if path:
-        return f"https://image.tmdb.org/t/p/w500{path}"
+        image_url = f"https://image.tmdb.org/t/p/w500{path}"
+        return posters.get_poster_url(Sources.TMDB.value, image_url)
     return settings.IMG_NONE
 
 

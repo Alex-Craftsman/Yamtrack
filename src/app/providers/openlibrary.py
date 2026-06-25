@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.cache import cache
 
-from app import helpers
+from app import helpers, posters
 from app.models import MediaTypes, Sources
 from app.providers import services
 
@@ -113,7 +113,8 @@ def get_image_url(doc):
     try:
         cover_id = doc["cover_i"]
         if cover_id:
-            return f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+            image_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+            return posters.get_poster_url(Sources.OPENLIBRARY.value, image_url)
 
     except KeyError:
         return settings.IMG_NONE
@@ -206,7 +207,8 @@ def get_cover_image_url(response):
     """Get the cover image URL from a work response."""
     covers = response.get("covers", [])
     if covers:
-        return f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
+        image_url = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
+        return posters.get_poster_url(Sources.OPENLIBRARY.value, image_url)
     return settings.IMG_NONE
 
 

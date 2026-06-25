@@ -14,7 +14,7 @@
     <div class="w-full md:w-1/4 max-w-[250px] mx-auto md:mx-0">
       <img alt="{{ media.title }}"
            class="w-full rounded-lg shadow-lg bg-[#2a2f35] object-cover"
-           src="{{ media.image }}">
+           src="{{ media.image|poster_url:media.source }}">
 
       <div x-data="{ trackOpen: false }">
         <button class="mt-4 p-3 rounded-lg w-full flex items-center text-white transition duration-300 cursor-pointer {% if user_medias %}bg-indigo-600 hover:bg-indigo-700{% else %}bg-gray-600 hover:bg-gray-700{% endif %}"
@@ -449,7 +449,7 @@
             <div class="grid grid-cols-[repeat(auto-fill,48px)] gap-2 items-center justify-between">
               {% for provider in watch_providers %}
                 <img class="rounded-md"
-                     src="{{ provider.image }}"
+                     src="{{ provider.image|poster_url:media.source }}"
                      title="{{ provider.provider_name }}"
                      alt="{{ provider.provider_name }}" />
               {% endfor %}
@@ -523,7 +523,7 @@
           <h2 class="text-xl font-bold mb-4">Cast</h2>
           <div class="flex overflow-x-auto gap-x-4 pb-5">
             {% for cast in media.cast %}
-              {% include "app/components/cast_card.html" with cast=cast %}
+              {% include "app/components/cast_card.html" with cast=cast source=media.source %}
             {% endfor %}
             {% if media.total_cast_count > 30 %}
               <a href="{{ media.source_url }}/cast"
@@ -589,7 +589,7 @@
                   }">
                   <img src="{{ IMG_NONE }}"
                        alt="E{{ episode.episode_number }}"
-                       data-src="{{ episode.image }}"
+                       data-src="{{ episode.image|poster_url:episode.source }}"
                        class="lazyload md:w-64 md:h-40 shrink-0 {% if episode.image != IMG_NONE %}object-cover{% endif %} {% if user.obfuscate_unseen_episodes and not episode.history and episode.image != IMG_NONE %}blur cursor-pointer{% else %}cursor-default{% endif %}"
                        :class="{ 'blur': obfuscated && hasImage, 'cursor-pointer': obfuscated && hasImage, 'cursor-default': !obfuscated || !hasImage }"
                        @click="obfuscated = false">

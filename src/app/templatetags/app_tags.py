@@ -9,7 +9,7 @@ from django.utils.dateparse import parse_date
 from django.utils.html import format_html
 from unidecode import unidecode
 
-from app import config, helpers
+from app import config, helpers, posters
 from app.models import MediaTypes, Sources, Status
 
 register = template.Library()
@@ -182,6 +182,12 @@ def media_past_verb(media_type):
 def sample_search(media_type):
     """Return a sample search URL for the given media type using GET parameters."""
     return config.get_sample_search_url(media_type)
+
+
+@register.filter
+def poster_url(image_url, source=None):
+    """Return a local cached poster URL for an external image URL."""
+    return posters.get_poster_url(source or Sources.MANUAL.value, image_url)
 
 
 @register.filter

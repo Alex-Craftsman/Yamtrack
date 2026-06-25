@@ -345,6 +345,10 @@ IMG_NONE = "https://www.themoviedb.org/assets/2/v4/glyphicons/basic/glyphicons-b
 
 REQUEST_TIMEOUT = 120  # seconds
 PER_PAGE = 24
+POSTER_CACHE_DIR = Path(config("POSTER_CACHE_DIR", default=BASE_DIR.parent / "poster"))
+POSTER_CACHE_TIMEOUT = (
+    config("POSTER_CACHE_TIMEOUT_HOURS", default=48, cast=int) * 60 * 60
+)
 
 TMDB_API = config(
     "TMDB_API",

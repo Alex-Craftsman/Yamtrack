@@ -20,7 +20,7 @@
         <div class="flex items-start gap-4">
           <img alt="{{ episode.title }}"
                class="w-20 h-20 rounded object-cover shrink-0"
-               src="{{ episode.image }}">
+               src="{{ episode.image|poster_url:episode.source }}">
           <div>
             <h3 class="text-lg font-semibold mb-1 line-clamp-1">{{ episode_title }}</h3>
             <p class="text-sm text-gray-400">Episode {{ episode.episode_number }}</p>

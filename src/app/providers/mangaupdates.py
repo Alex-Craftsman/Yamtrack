@@ -7,7 +7,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 
-from app import helpers
+from app import helpers, posters
 from app.models import MediaTypes, Sources
 from app.providers import services
 
@@ -161,7 +161,9 @@ def get_image_url(response):
     """Get the image URL for a media item."""
     # when no image, value from response is null
     url = response["image"]["url"]["original"]
-    return url or settings.IMG_NONE
+    if url:
+        return posters.get_poster_url(Sources.MANGAUPDATES.value, url)
+    return settings.IMG_NONE
 
 
 def get_max_progress(response):

@@ -1,3 +1,5 @@
+{% load app_tags %}
+
 {% for custom_list in custom_lists %}
   <div class="bg-[#2a2f35] rounded-lg overflow-hidden hover:shadow-lg group"
        x-data="{ showModal: false }"
@@ -5,7 +7,7 @@
     <div class="relative h-48 flex items-center justify-center">
       <img alt="{{ custom_list.name }}"
            class="{% if custom_list.image != IMG_NONE %}w-full h-full object-cover{% else %}w-3/5 h-3/5{% endif %}"
-           src="{{ custom_list.image }}">
+           src="{{ custom_list.image|poster_url }}">
 
       <div class="absolute inset-0 bg-black/40 transition-opacity group-hover:bg-black/50"></div>
       <a href="{% url 'list_detail' custom_list.id %}"

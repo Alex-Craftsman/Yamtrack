@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 
-from app import helpers
+from app import helpers, posters
 from app.models import MediaTypes, Sources
 from app.providers import services
 
@@ -379,7 +379,11 @@ def get_image_url(response):
     # when no image, cover is not present in the response
     # e.g game: 287348
     try:
-        return f"https://images.igdb.com/igdb/image/upload/t_original/{response['cover']['image_id']}.jpg"
+        image_url = (
+            "https://images.igdb.com/igdb/image/upload/t_original/"
+            f"{response['cover']['image_id']}.jpg"
+        )
+        return posters.get_poster_url(Sources.IGDB.value, image_url)
     except KeyError:
         return settings.IMG_NONE
 

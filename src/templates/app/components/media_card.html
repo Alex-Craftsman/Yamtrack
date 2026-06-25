@@ -6,7 +6,7 @@
     <a href="{{ item|media_url }}">
       <img alt="{{ title }}"
            class="lazyload w-full {% if from_grid %}aspect-2/3{% else %}h-48{% endif %} bg-[#3e454d] {% if item.image != IMG_NONE %}object-cover{% endif %}"
-           data-src="{{ item.image }}"
+           data-src="{{ item.image|poster_url:item.source }}"
            src="{{ IMG_NONE }}">
     </a>
     {% with user=target_user|default:user %}

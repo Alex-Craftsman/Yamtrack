@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.cache import cache
 
-from app import helpers
+from app import helpers, posters
 from app.models import MediaTypes, Sources
 from app.providers import services
 
@@ -168,7 +168,10 @@ def comic(media_id):
 def get_image(response):
     """Return the image URL."""
     if "image" in response:
-        return response["image"]["medium_url"]
+        return posters.get_poster_url(
+            Sources.COMICVINE.value,
+            response["image"]["medium_url"],
+        )
     return settings.IMG_NONE
 
 

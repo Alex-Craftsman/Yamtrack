@@ -6,7 +6,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 
-from app import helpers
+from app import helpers, posters
 from app.models import MediaTypes, Sources
 from app.providers import services
 
@@ -232,7 +232,10 @@ def get_image_url(response):
     # when no picture, main_picture is not present in the response
     # e.g anime: 38869
     try:
-        return response["main_picture"]["large"]
+        return posters.get_poster_url(
+            Sources.MAL.value,
+            response["main_picture"]["large"],
+        )
     except KeyError:
         return settings.IMG_NONE
 

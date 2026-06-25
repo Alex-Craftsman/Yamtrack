@@ -12,6 +12,7 @@ usermod -o -u "$PUID" abc
 
 chown abc:abc /yamtrack
 chown -R abc:abc db
+chown -R abc:abc /poster
 chown -R abc:abc staticfiles
 chown -R abc:abc /var/log/nginx
 chown -R abc:abc /var/lib/nginx
