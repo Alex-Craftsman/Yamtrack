@@ -191,6 +191,13 @@ WSGI_APPLICATION = "config.wsgi.application"
 Path(BASE_DIR / "db").mkdir(parents=True, exist_ok=True)
 
 if config("DB_HOST", default=None):
+    # Общий PostgreSQL на несколько сервисов: держим пул компактным и отдаём
+    # idle-соединения обратно (см. db/docs/connection-pooling). Размер пула
+    # подбираем под реальный параллелизм процесса, а не «на всякий случай».
+    # gunicorn: до 4 воркеров × threads=4 → каждому воркеру хватает 4 соединений.
+    # celery/beat: concurrency=1 → нужно 1 соединение, +1 запас.
+    _is_celery = "celery" in Path(sys.argv[0]).name if sys.argv else False
+    _pool_max_size = 2 if _is_celery else 4
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -200,7 +207,13 @@ if config("DB_HOST", default=None):
             "PASSWORD": config("DB_PASSWORD", default=secret("DB_PASSWORD_FILE")),
             "PORT": config("DB_PORT"),
             "OPTIONS": {
-                "pool": True,
+                "pool": {
+                    "min_size": 1,                 # не держать соединения в покое
+                    "max_size": _pool_max_size,    # верхний предел на процесс
+                    "max_idle": 30,                # закрыть простаивавшее (сек)
+                    "max_lifetime": 1800,          # периодическая ротация (сек)
+                },
+                "connect_timeout": 10,             # быстрый фейл вместо зависания
             },
         },
     }
