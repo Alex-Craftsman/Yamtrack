@@ -214,7 +214,19 @@ if config("DB_HOST", default=None):
                     "max_lifetime": 1800,          # периодическая ротация (сек)
                 },
                 "connect_timeout": 10,             # быстрый фейл вместо зависания
+                # PgBouncer в transaction mode гоняет подряд идущие транзакции по
+                # РАЗНЫМ бэкендам postgres. psycopg3 по умолчанию авто-готовит
+                # частые запросы (prepare_threshold=5) на конкретном бэкенде →
+                # на следующей транзакции этого statement нет → InvalidSqlStatementName
+                # ("prepared statement _pg3_x does not exist"). None отключает
+                # server-side prepared statements. Безопасно и при прямом postgres.
+                "prepare_threshold": None,
             },
+            # Тот же transaction mode ломает именованные server-side курсоры
+            # (QuerySet.iterator() в statistics.py/exports.py): курсор объявлен в
+            # одной транзакции, FETCH уходит в следующую → другой бэкенд → курсора
+            # нет. Отключаем — Django отдаёт .iterator() клиентскими чанками.
+            "DISABLE_SERVER_SIDE_CURSORS": True,
         },
     }
 
