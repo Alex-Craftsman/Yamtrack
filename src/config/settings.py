@@ -488,6 +488,29 @@ TRAKT_API_SECRET = config(
     ),
 )
 
+# Release approval integration. Yamtrack owns the UI/audit trail while Seerr is
+# the request source and Radarr is the release search/download backend.
+SEERR_URL = config("SEERR_URL", default="http://seerr:5055")
+SEERR_API_KEY = config(
+    "SEERR_API_KEY",
+    default=secret("SEERR_API_KEY_FILE", default=""),
+)
+RADARR_URL = config("RADARR_URL", default="http://radarr:7878")
+RADARR_API_KEY = config(
+    "RADARR_API_KEY",
+    default=secret("RADARR_API_KEY_FILE", default=""),
+)
+RELEASE_APPROVAL_REQUEST_TAKE = config(
+    "RELEASE_APPROVAL_REQUEST_TAKE",
+    default=100,
+    cast=int,
+)
+RELEASE_APPROVAL_SYNC_CANDIDATES_LIMIT = config(
+    "RELEASE_APPROVAL_SYNC_CANDIDATES_LIMIT",
+    default=3,
+    cast=int,
+)
+
 ANILIST_ID = config(
     "ANILIST_ID",
     default=secret(
@@ -606,6 +629,10 @@ CELERY_BEAT_SCHEDULE = {
     "cleanup_user_messages": {
         "task": "Cleanup user messages",
         "schedule": 60 * 60 * 24,  # every 24 hours
+    },
+    "sync_release_approval": {
+        "task": "Sync release approval",
+        "schedule": 60 * 15,  # every 15 minutes
     },
 }
 

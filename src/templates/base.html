@@ -173,6 +173,21 @@
                       <span>Calendar</span>
                     </a>
                   </li>
+
+                  {% url 'release_approval_requests' as release_approval_url %}
+                  <li>
+                    <a href="{{ release_approval_url }}"
+                       class="flex items-center space-x-3 px-4 py-2 rounded-md transition-colors duration-200 text-sm {% if request.path == release_approval_url or request.path|slice:':17' == '/release-approval' %}text-white bg-[#2c3136]{% else %}text-gray-400 hover:text-white hover:bg-[#23272b]{% endif %}">
+                      {% if request.path == release_approval_url or request.path|slice:':17' == '/release-approval' %}
+                        {% include "app/icons/download.svg" with classes="w-5 h-5 text-indigo-400 " %}
+
+                      {% else %}
+                        {% include "app/icons/download.svg" with classes="w-5 h-5" %}
+
+                      {% endif %}
+                      <span>Release Approval</span>
+                    </a>
+                  </li>
                 </ul>
               </div>
             {% endblock sidebar_utilities %}

@@ -7,6 +7,8 @@ from django.contrib.admin.sites import AlreadyRegistered
 from app.models import (
     Episode,
     Item,
+    ReleaseApprovalCandidate,
+    ReleaseApprovalItem,
     UserMessage,
 )
 
@@ -45,6 +47,41 @@ class UserMessageAdmin(admin.ModelAdmin):
     list_filter = ["level", "shown_at"]
 
 
+@admin.register(ReleaseApprovalItem)
+class ReleaseApprovalItemAdmin(admin.ModelAdmin):
+    """Admin for synced release approval requests."""
+
+    search_fields = ["title", "tmdb_id", "seerr_request_id"]
+    list_display = [
+        "title",
+        "media_type",
+        "tmdb_id",
+        "seerr_request_id",
+        "seerr_status",
+        "has_file",
+        "synced_at",
+    ]
+    list_filter = ["media_type", "has_file", "seerr_status"]
+
+
+@admin.register(ReleaseApprovalCandidate)
+class ReleaseApprovalCandidateAdmin(admin.ModelAdmin):
+    """Admin for stored release candidates."""
+
+    search_fields = ["title", "indexer", "item__title", "item__tmdb_id"]
+    list_display = [
+        "title",
+        "item",
+        "indexer",
+        "quality",
+        "score",
+        "verdict",
+        "status",
+        "approved_at",
+    ]
+    list_filter = ["status", "verdict", "indexer", "quality"]
+
+
 class MediaAdmin(admin.ModelAdmin):
     """Custom admin for regular media model with search and filter options."""
 
@@ -58,7 +95,14 @@ class MediaAdmin(admin.ModelAdmin):
 
 # Auto-register remaining models
 app_models = apps.get_app_config("app").get_models()
-SpecialModels = ["Item", "Episode", "BasicMedia", "UserMessage"]
+SpecialModels = [
+    "Item",
+    "Episode",
+    "BasicMedia",
+    "UserMessage",
+    "ReleaseApprovalItem",
+    "ReleaseApprovalCandidate",
+]
 for model in app_models:
     if (
         not model.__name__.startswith("Historical")

@@ -1,4 +1,6 @@
+import contextlib
 import logging
+import re
 from pathlib import Path
 
 from django.apps import apps
@@ -19,6 +21,7 @@ from django.utils.timezone import datetime
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from app import config, helpers, history_processor
+from app import release_approval
 from app import statistics as stats
 from app.forms import EpisodeForm, ManualItemForm, get_form_class
 from app.models import (
@@ -29,6 +32,8 @@ from app.models import (
     Season,
     Sources,
     Status,
+    ReleaseApprovalCandidate,
+    ReleaseApprovalItem,
     UserMessage,
 )
 from app.providers import manual, services, tmdb
@@ -93,6 +98,449 @@ def home(request):
         "items_limit": items_limit,
     }
     return render(request, "app/home.html", context)
+
+
+@require_GET
+def release_approval_requests(request):
+    """Show Seerr movie requests that can be approved for download."""
+    if not release_approval.is_configured():
+        messages.error(request, "Release approval is not configured.")
+        return render(request, "app/release_approval_requests.html", {"rows": []})
+
+    if not ReleaseApprovalItem.objects.exists():
+        sync_release_approval_items()
+    items = ReleaseApprovalItem.objects.prefetch_related("candidates").order_by(
+        "-created_at",
+    )
+    rows_by_tmdb = {}
+    for item in items:
+        rows_by_tmdb.setdefault(item.tmdb_id, item)
+    rows = list(rows_by_tmdb.values())
+    for item in rows:
+        approved_candidates = [
+            candidate
+            for candidate in item.candidates.all()
+            if candidate.status == ReleaseApprovalCandidate.Status.APPROVED
+        ]
+        item.latest_approved_candidate = max(
+            approved_candidates,
+            key=lambda candidate: candidate.approved_at or candidate.created_at,
+            default=None,
+        )
+        item.visible_candidate_count = sum(
+            1
+            for candidate in item.candidates.all()
+            if not is_suspicious_release_candidate(candidate)
+        )
+        item.total_candidate_count = len(item.candidates.all())
+        item.poster_url = release_approval_cover_url(item, "poster")
+        item.fanart_url = release_approval_cover_url(item, "fanart")
+
+    return render(request, "app/release_approval_requests.html", {"rows": rows})
+
+
+@require_POST
+def release_approval_refresh_requests(request):
+    """Refresh Seerr movie requests into Yamtrack."""
+    if not release_approval.is_configured():
+        messages.error(request, "Release approval is not configured.")
+        return redirect("release_approval_requests")
+
+    sync_release_approval_items()
+    messages.success(request, "Seerr requests refreshed.")
+    return redirect("release_approval_requests")
+
+
+def sync_release_approval_items():
+    """Sync Seerr movie requests into Yamtrack release approval items."""
+    seerr_requests = release_approval.seerr_requests()
+    radarr_movies = release_approval.radarr_movies_by_tmdb()
+
+    for seerr_request in seerr_requests:
+        media = seerr_request.get("media") or {}
+        tmdb_id = media.get("tmdbId")
+        if not tmdb_id:
+            continue
+
+        movie = radarr_movies.get(int(tmdb_id), {})
+        ReleaseApprovalItem.objects.update_or_create(
+            seerr_request_id=seerr_request["id"],
+            defaults={
+                "media_type": ReleaseApprovalItem.MediaType.MOVIE,
+                "tmdb_id": int(tmdb_id),
+                "title": movie.get("title")
+                or media.get("title")
+                or media.get("originalTitle")
+                or f"tmdb:{tmdb_id}",
+                "year": movie.get("year"),
+                "seerr_status": release_approval.request_status_label(seerr_request),
+                "radarr_movie_id": movie.get("id"),
+                "has_file": bool(movie.get("hasFile")),
+                "request_data": seerr_request,
+                "movie_data": movie,
+            },
+        )
+
+
+def get_release_approval_item_by_tmdb(tmdb_id):
+    """Return the most recent synced approval item for a TMDB movie ID."""
+    item = (
+        ReleaseApprovalItem.objects.filter(
+            media_type=ReleaseApprovalItem.MediaType.MOVIE,
+            tmdb_id=tmdb_id,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if item is None:
+        raise Http404
+    copy_candidates_from_previous_item(item)
+    return item
+
+
+def copy_candidates_from_previous_item(item):
+    """Seed a repeated request with candidates from the previous same-TMDB item."""
+    if item.candidates.exists():
+        return
+
+    previous_item = (
+        ReleaseApprovalItem.objects.filter(
+            media_type=item.media_type,
+            tmdb_id=item.tmdb_id,
+        )
+        .exclude(id=item.id)
+        .filter(candidates__isnull=False)
+        .order_by("-created_at")
+        .first()
+    )
+    if previous_item is None:
+        return
+
+    candidates = []
+    for candidate in previous_item.candidates.all():
+        candidates.append(
+            ReleaseApprovalCandidate(
+                item=item,
+                identity=candidate.identity,
+                title=candidate.title,
+                indexer=candidate.indexer,
+                info_url=candidate.info_url,
+                quality=candidate.quality,
+                size=candidate.size,
+                seeders=candidate.seeders,
+                score=candidate.score,
+                verdict=candidate.verdict,
+                score_reasons=candidate.score_reasons,
+                score_warnings=candidate.score_warnings,
+                release_data=candidate.release_data,
+            ),
+        )
+    ReleaseApprovalCandidate.objects.bulk_create(candidates, ignore_conflicts=True)
+
+
+@require_GET
+def release_approval_movie(request, tmdb_id):
+    """Show scored Radarr release candidates for a movie request."""
+    if not release_approval.is_configured():
+        messages.error(request, "Release approval is not configured.")
+        return redirect("release_approval_requests")
+
+    sync_release_approval_items()
+    item = get_release_approval_item_by_tmdb(tmdb_id)
+    show_all = request.GET.get("show") == "all"
+    all_candidates = list(item.candidates.all())
+    suspicious_filter = request.GET.get("suspicious") or ("show" if show_all else "hide")
+    base_candidates = filter_suspicious_release_candidates(
+        all_candidates,
+        suspicious_filter,
+    )
+    candidates = filter_release_approval_candidates(base_candidates, request.GET)
+    indexers = sorted({candidate.indexer for candidate in all_candidates if candidate.indexer})
+    qualities = sorted({candidate.quality for candidate in all_candidates if candidate.quality})
+    verdicts = sorted({candidate.verdict for candidate in all_candidates if candidate.verdict})
+    years = sorted(
+        {
+            year
+            for candidate in all_candidates
+            for year in release_candidate_years(candidate)
+        },
+        reverse=True,
+    )
+    languages = sorted(
+        {
+            language
+            for candidate in all_candidates
+            for language in release_candidate_languages(candidate)
+        },
+    )
+    item.poster_url = release_approval_cover_url(item, "poster")
+    item.fanart_url = release_approval_cover_url(item, "fanart")
+
+    filter_params = request.GET.copy()
+    filter_params.pop("show", None)
+    show_all_query = filter_params.copy()
+    show_all_query["show"] = "all"
+
+    return render(
+        request,
+        "app/release_approval_movie.html",
+        {
+            "item": item,
+            "candidates": candidates,
+            "hidden_candidates_count": len(all_candidates) - len(base_candidates),
+            "filtered_candidates_count": len(base_candidates) - len(candidates),
+            "show_all": show_all,
+            "indexers": indexers,
+            "qualities": qualities,
+            "verdicts": verdicts,
+            "filters": {
+                "q": request.GET.get("q", ""),
+                "indexer": request.GET.get("indexer", ""),
+                "quality": request.GET.get("quality", ""),
+                "verdict": request.GET.get("verdict", ""),
+                "year": request.GET.get("year", ""),
+                "min_score": request.GET.get("min_score", ""),
+                "min_seeders": request.GET.get("min_seeders", ""),
+                "min_size": request.GET.get("min_size", ""),
+                "max_size": request.GET.get("max_size", ""),
+                "language": request.GET.get("language", ""),
+                "external_id": request.GET.get("external_id", ""),
+                "rejected": request.GET.get("rejected", ""),
+                "suspicious": suspicious_filter,
+            },
+            "years": years,
+            "languages": languages,
+            "filter_query": filter_params.urlencode(),
+            "show_all_query": show_all_query.urlencode(),
+        },
+    )
+
+
+def filter_release_approval_candidates(candidates, params):
+    """Apply UI filters to stored release candidates."""
+    query = (params.get("q") or "").strip().lower()
+    indexer = params.get("indexer") or ""
+    quality = params.get("quality") or ""
+    verdict = params.get("verdict") or ""
+    year = parse_int_filter(params.get("year"))
+    language = params.get("language") or ""
+    external_id = params.get("external_id") or ""
+    rejected = params.get("rejected") or ""
+    suspicious = params.get("suspicious") or "hide"
+    min_score = parse_int_filter(params.get("min_score"))
+    min_seeders = parse_int_filter(params.get("min_seeders"))
+    min_size = parse_size_gib_filter(params.get("min_size"))
+    max_size = parse_size_gib_filter(params.get("max_size"))
+
+    filtered = []
+    for candidate in candidates:
+        if query and query not in candidate.title.lower() and query not in candidate.indexer.lower():
+            continue
+        if indexer and candidate.indexer != indexer:
+            continue
+        if quality and candidate.quality != quality:
+            continue
+        if verdict and candidate.verdict != verdict:
+            continue
+        if year is not None and year not in release_candidate_years(candidate):
+            continue
+        if language and language not in release_candidate_languages(candidate):
+            continue
+        if min_score is not None and candidate.score < min_score:
+            continue
+        if min_seeders is not None and candidate.seeders < min_seeders:
+            continue
+        if min_size is not None and candidate.size < min_size:
+            continue
+        if max_size is not None and candidate.size > max_size:
+            continue
+        has_external_id = bool(
+            (candidate.release_data or {}).get("tmdbId")
+            or (candidate.release_data or {}).get("imdbId")
+        )
+        if external_id == "yes" and not has_external_id:
+            continue
+        if external_id == "no" and has_external_id:
+            continue
+        if suspicious == "hide" and is_suspicious_release_candidate(candidate):
+            continue
+        if suspicious == "only" and not is_suspicious_release_candidate(candidate):
+            continue
+        if rejected == "yes" and not candidate.release_data.get("rejected"):
+            continue
+        if rejected == "no" and candidate.release_data.get("rejected"):
+            continue
+        filtered.append(candidate)
+    return filtered
+
+
+def filter_suspicious_release_candidates(candidates, suspicious_filter):
+    """Apply the top-level suspicious visibility filter."""
+    if suspicious_filter == "show":
+        return candidates
+    if suspicious_filter == "only":
+        return [
+            candidate
+            for candidate in candidates
+            if is_suspicious_release_candidate(candidate)
+        ]
+    return [
+        candidate
+        for candidate in candidates
+        if not is_suspicious_release_candidate(candidate)
+    ]
+
+
+def is_suspicious_release_candidate(candidate):
+    """Return whether a candidate should be hidden by default."""
+    return candidate.score < 0 or bool(candidate.release_data.get("rejected"))
+
+
+def release_approval_cover_url(item, cover_type):
+    """Return a Radarr cover URL from stored movie metadata."""
+    for image in (item.movie_data or {}).get("images", []):
+        if image.get("coverType") == cover_type:
+            return image.get("remoteUrl") or image.get("url") or ""
+    return ""
+
+
+def parse_int_filter(value):
+    """Parse an integer filter, returning None for empty/invalid values."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    with contextlib.suppress(ValueError):
+        return int(value)
+    return None
+
+
+def parse_size_gib_filter(value):
+    """Parse a GiB size filter into bytes."""
+    parsed = parse_int_filter(value)
+    if parsed is None:
+        return None
+    return parsed * 1024 * 1024 * 1024
+
+
+def release_candidate_years(candidate):
+    """Return years found in the displayed and original release titles."""
+    text = " ".join(
+        [
+            candidate.title or "",
+            (candidate.release_data or {}).get("title") or "",
+        ],
+    )
+    return {int(value) for value in re.findall(r"\b(19\d{2}|20\d{2})\b", text)}
+
+
+def release_candidate_languages(candidate):
+    """Return language names from a Radarr release payload."""
+    return {
+        language.get("name")
+        for language in (candidate.release_data or {}).get("languages", [])
+        if language.get("name")
+    }
+
+
+@require_POST
+def release_approval_refresh_movie(request, tmdb_id):
+    """Refresh Radarr release candidates for a movie request."""
+    if not release_approval.is_configured():
+        messages.error(request, "Release approval is not configured.")
+        return redirect("release_approval_requests")
+
+    sync_release_approval_items()
+    item = get_release_approval_item_by_tmdb(tmdb_id)
+    if not item.radarr_movie_id:
+        messages.error(request, f"tmdb:{tmdb_id} is not in Radarr yet.")
+        return redirect("release_approval_requests")
+
+    movie = release_approval.radarr_movie(item.radarr_movie_id)
+    item.movie_data = movie
+    item.has_file = bool(movie.get("hasFile"))
+    item.save(update_fields=["movie_data", "has_file", "synced_at"])
+    sync_release_approval_candidates(item, movie)
+    messages.success(request, "Release candidates refreshed.")
+    return redirect("release_approval_movie", tmdb_id=tmdb_id)
+
+
+def sync_release_approval_candidates(item, movie):
+    """Sync and score Radarr release candidates into Yamtrack."""
+    releases = release_approval.radarr_releases(movie["id"])
+    scored = release_approval.score_releases(movie, releases)
+    seen = set()
+
+    for candidate in scored:
+        release = candidate["release"]
+        score = candidate["score"]
+        identity = candidate["identity"]
+        seen.add(identity)
+        quality = ((release.get("quality") or {}).get("quality") or {}).get("name") or ""
+        ReleaseApprovalCandidate.objects.update_or_create(
+            item=item,
+            identity=identity,
+            defaults={
+                "title": release_approval.release_display_title(movie, release),
+                "indexer": release.get("indexer") or "",
+                "info_url": release.get("infoUrl") or "",
+                "quality": quality,
+                "size": int(release.get("size") or 0),
+                "seeders": int(release.get("seeders") or 0),
+                "score": score.score,
+                "verdict": score.verdict,
+                "score_reasons": score.reasons,
+                "score_warnings": score.warnings,
+                "release_data": release,
+            },
+        )
+
+    item.candidates.filter(
+        status=ReleaseApprovalCandidate.Status.PENDING,
+    ).exclude(identity__in=seen).delete()
+
+
+@require_POST
+def release_approval_grab_movie(request, tmdb_id):
+    """Approve a selected Radarr release candidate."""
+    if not release_approval.is_configured():
+        messages.error(request, "Release approval is not configured.")
+        return redirect("release_approval_requests")
+
+    candidate_id = request.POST.get("candidate_id")
+    if not candidate_id:
+        return HttpResponseBadRequest("Missing candidate id")
+
+    candidate = get_object_or_404(
+        ReleaseApprovalCandidate,
+        id=candidate_id,
+        item__media_type=ReleaseApprovalItem.MediaType.MOVIE,
+        item__tmdb_id=tmdb_id,
+    )
+
+    redirect_url = request.POST.get("next") or reverse(
+        "release_approval_movie",
+        kwargs={"tmdb_id": tmdb_id},
+    )
+    if not redirect_url.startswith(f"/release-approval/movie/{tmdb_id}"):
+        redirect_url = reverse("release_approval_movie", kwargs={"tmdb_id": tmdb_id})
+
+    try:
+        release_approval.grab_release(candidate.release_data)
+    except release_approval.ReleaseApprovalError as error:
+        logger.exception("Failed to grab release approval candidate %s", candidate.id)
+        messages.error(request, f"Radarr rejected the release: {error}")
+        return redirect(redirect_url)
+    except Exception as error:
+        logger.exception("Unexpected release approval failure for candidate %s", candidate.id)
+        messages.error(request, f"Could not approve the release: {error}")
+        return redirect(redirect_url)
+
+    candidate.status = ReleaseApprovalCandidate.Status.APPROVED
+    candidate.approved_by = request.user if request.user.is_authenticated else None
+    candidate.approved_at = timezone.now()
+    candidate.save(update_fields=["status", "approved_by", "approved_at", "synced_at"])
+    messages.success(request, "Release sent to Radarr.")
+    return redirect(redirect_url)
 
 
 @require_POST

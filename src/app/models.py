@@ -1925,3 +1925,103 @@ class BoardGame(Media):
     """Model for board games."""
 
     tracker = FieldTracker()
+
+
+class ReleaseApprovalItem(models.Model):
+    """Synced Seerr request that needs release approval."""
+
+    class MediaType(models.TextChoices):
+        MOVIE = "movie", "Movie"
+        TV = "tv", "TV"
+
+    media_type = models.CharField(
+        max_length=10,
+        choices=MediaType,
+        default=MediaType.MOVIE,
+    )
+    seerr_request_id = models.PositiveIntegerField(unique=True)
+    tmdb_id = models.PositiveIntegerField()
+    title = models.TextField()
+    year = models.PositiveIntegerField(null=True, blank=True)
+    seerr_status = models.CharField(max_length=80)
+    radarr_movie_id = models.PositiveIntegerField(null=True, blank=True)
+    has_file = models.BooleanField(default=False)
+    request_data = models.JSONField()
+    movie_data = models.JSONField(default=dict)
+    synced_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["media_type", "tmdb_id"],
+                name="app_release_media_t_25f8da_idx",
+            ),
+            models.Index(fields=["synced_at"], name="app_release_synced__554805_idx"),
+        ]
+
+    def __str__(self):
+        """Return a compact display value."""
+        return f"{self.media_type}:{self.tmdb_id} {self.title}"
+
+
+class ReleaseApprovalCandidate(models.Model):
+    """Stored release candidate from Radarr/Sonarr search results."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    item = models.ForeignKey(
+        ReleaseApprovalItem,
+        on_delete=models.CASCADE,
+        related_name="candidates",
+    )
+    identity = models.TextField()
+    title = models.TextField()
+    indexer = models.CharField(max_length=255, blank=True)
+    info_url = models.URLField(blank=True)
+    quality = models.CharField(max_length=80, blank=True)
+    size = models.BigIntegerField(default=0)
+    seeders = models.IntegerField(default=0)
+    score = models.IntegerField()
+    verdict = models.CharField(max_length=40)
+    score_reasons = models.JSONField(default=list)
+    score_warnings = models.JSONField(default=list)
+    release_data = models.JSONField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status,
+        default=Status.PENDING,
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    synced_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-score", "title"]
+        constraints = [
+            UniqueConstraint(
+                fields=["item", "identity"],
+                name="unique_release_approval_candidate_identity",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["status", "-score"],
+                name="app_release_status_58c9a5_idx",
+            ),
+            models.Index(fields=["synced_at"], name="app_release_synced__1217de_idx"),
+        ]
+
+    def __str__(self):
+        """Return a compact display value."""
+        return f"{self.item} {self.title}"

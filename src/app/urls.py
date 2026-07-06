@@ -91,5 +91,30 @@ urlpatterns = [
         name="search_parent_season",
     ),
     path("statistics", views.statistics, name="statistics"),
+    path(
+        "release-approval",
+        views.release_approval_requests,
+        name="release_approval_requests",
+    ),
+    path(
+        "release-approval/refresh",
+        views.release_approval_refresh_requests,
+        name="release_approval_refresh_requests",
+    ),
+    path(
+        "release-approval/movie/<int:tmdb_id>",
+        views.release_approval_movie,
+        name="release_approval_movie",
+    ),
+    path(
+        "release-approval/movie/<int:tmdb_id>/refresh",
+        views.release_approval_refresh_movie,
+        name="release_approval_refresh_movie",
+    ),
+    path(
+        "release-approval/movie/<int:tmdb_id>/grab",
+        views.release_approval_grab_movie,
+        name="release_approval_grab_movie",
+    ),
     path("serviceworker.js", views.service_worker, name="service_worker"),
 ]

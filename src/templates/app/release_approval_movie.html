@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {{ item.title }} - Release Approval
+{% endblock title %}
+
+{% block content %}
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="mb-6 overflow-hidden rounded-lg border border-[#2c3136] bg-[#1a1d20]">
+      <div class="relative min-h-[280px] bg-[#2c3136]">
+        {% if item.fanart_url %}
+          <img src="{{ item.fanart_url }}"
+               alt=""
+               class="absolute inset-0 h-full w-full object-cover">
+        {% elif item.poster_url %}
+          <img src="{{ item.poster_url }}"
+               alt=""
+               class="absolute inset-0 h-full w-full object-cover">
+        {% endif %}
+        <div class="absolute inset-0 bg-gradient-to-t from-[#111318] via-[#111318]/75 to-[#111318]/25"></div>
+        <div class="relative flex min-h-[280px] flex-col justify-between p-5 md:p-6">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <a href="{% url 'release_approval_requests' %}"
+               class="rounded-md bg-[#111318]/75 px-3 py-1.5 text-sm text-indigo-200 ring-1 ring-white/10 hover:bg-[#111318]">Back to requests</a>
+            <form method="post"
+                  action="{% url 'release_approval_refresh_movie' tmdb_id=item.tmdb_id %}">
+              {% csrf_token %}
+              <button type="submit"
+                      class="rounded-md border border-white/10 bg-[#111318]/75 px-3 py-1.5 text-sm text-gray-100 hover:bg-[#111318]">
+                Refresh candidates
+              </button>
+            </form>
+          </div>
+
+          <div class="max-w-4xl">
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+              {% if item.year %}
+                <span class="rounded-full bg-[#111318]/75 px-3 py-1 text-xs text-gray-200 ring-1 ring-white/10">{{ item.year }}</span>
+              {% endif %}
+              <span class="rounded-full bg-[#111318]/75 px-3 py-1 text-xs text-gray-200 ring-1 ring-white/10">tmdb:{{ item.tmdb_id }}</span>
+              {% if item.has_file %}
+                <span class="rounded-full bg-green-500/20 px-3 py-1 text-xs text-green-200 ring-1 ring-green-400/25">has file</span>
+              {% else %}
+                <span class="rounded-full bg-yellow-500/20 px-3 py-1 text-xs text-yellow-200 ring-1 ring-yellow-400/25">no file</span>
+              {% endif %}
+            </div>
+            <h1 class="text-3xl font-semibold leading-tight text-white md:text-4xl">{{ item.title }}</h1>
+            {% if item.movie_data.overview %}
+              <p class="mt-3 max-w-3xl text-sm leading-6 text-gray-300">{{ item.movie_data.overview }}</p>
+            {% endif %}
+            <div class="mt-4 text-xs text-gray-400">
+              {{ candidates|length }} visible candidates
+              {% if filtered_candidates_count %}
+                · {{ filtered_candidates_count }} filtered out
+              {% endif %}
+              {% if hidden_candidates_count %}
+                · {{ hidden_candidates_count }} rejected/suspicious hidden
+              {% endif %}
+              · last synced {{ item.synced_at }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if item.candidates.all %}
+      <div class="mb-6 rounded-md border border-[#2c3136] bg-[#1a1d20] p-4">
+        <h2 class="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">Approved candidates</h2>
+        <div class="space-y-2">
+          {% for candidate in item.candidates.all %}
+            {% if candidate.status == "approved" %}
+              <div class="text-sm text-gray-300">
+                <span class="text-gray-100">{{ candidate.title }}</span>
+                <span class="text-gray-500"> · {{ candidate.verdict }} · {{ candidate.score }} · {{ candidate.approved_at }}</span>
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    <details class="mb-4 rounded-md border border-[#2c3136] bg-[#1a1d20]">
+      <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-100 hover:bg-[#23272b]">
+        Filters
+      </summary>
+      <form method="get" class="border-t border-[#2c3136] p-4">
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <label class="block xl:col-span-2">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Search</span>
+            <input type="search" name="q" value="{{ filters.q }}" placeholder="Title or indexer" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500">
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Suspicious</span>
+            <select name="suspicious" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+              <option value="hide" {% if filters.suspicious == "hide" %}selected{% endif %}>Hide</option>
+              <option value="show" {% if filters.suspicious == "show" %}selected{% endif %}>Show</option>
+              <option value="only" {% if filters.suspicious == "only" %}selected{% endif %}>Only</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Rejected</span>
+            <select name="rejected" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+              <option value="">Any</option>
+              <option value="no" {% if filters.rejected == "no" %}selected{% endif %}>No</option>
+              <option value="yes" {% if filters.rejected == "yes" %}selected{% endif %}>Yes</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Indexer</span>
+            <select name="indexer" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+              <option value="">Any</option>
+              {% for indexer in indexers %}
+                <option value="{{ indexer }}" {% if filters.indexer == indexer %}selected{% endif %}>{{ indexer }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Quality</span>
+            <select name="quality" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+              <option value="">Any</option>
+              {% for quality in qualities %}
+                <option value="{{ quality }}" {% if filters.quality == quality %}selected{% endif %}>{{ quality }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Verdict</span>
+            <select name="verdict" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+              <option value="">Any</option>
+              {% for verdict in verdicts %}
+                <option value="{{ verdict }}" {% if filters.verdict == verdict %}selected{% endif %}>{{ verdict }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Year</span>
+            <select name="year" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+              <option value="">Any</option>
+              {% for year in years %}
+                <option value="{{ year }}" {% if filters.year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Language</span>
+            <select name="language" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+              <option value="">Any</option>
+              {% for language in languages %}
+                <option value="{{ language }}" {% if filters.language == language %}selected{% endif %}>{{ language }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Min Score</span>
+            <input type="number" name="min_score" value="{{ filters.min_score }}" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Min Seeders</span>
+            <input type="number" min="0" name="min_seeders" value="{{ filters.min_seeders }}" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Min Size GiB</span>
+            <input type="number" min="0" name="min_size" value="{{ filters.min_size }}" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">Max Size GiB</span>
+            <input type="number" min="0" name="max_size" value="{{ filters.max_size }}" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-wider text-gray-400">External ID</span>
+            <select name="external_id" class="w-full rounded-md border border-[#3a4149] bg-[#212529] px-3 py-2 text-sm text-gray-100">
+              <option value="">Any</option>
+              <option value="yes" {% if filters.external_id == "yes" %}selected{% endif %}>Yes</option>
+              <option value="no" {% if filters.external_id == "no" %}selected{% endif %}>No</option>
+            </select>
+          </label>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <button type="submit" class="rounded-md border border-indigo-500/40 bg-indigo-500/15 px-3 py-1.5 text-sm text-indigo-100 hover:bg-indigo-500/25">Apply filters</button>
+          <a href="{% url 'release_approval_movie' tmdb_id=item.tmdb_id %}" class="rounded-md border border-[#3a4149] bg-[#2c3136] px-3 py-1.5 text-sm text-gray-100 hover:bg-[#343a42]">Reset</a>
+        </div>
+      </form>
+    </details>
+
+    <div class="space-y-4">
+      {% for candidate in candidates %}
+        <article class="rounded-md border border-[#2c3136] bg-[#1a1d20] p-4 shadow-sm">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-3">
+                {% if candidate.score >= 100 %}
+                  <div class="text-2xl font-semibold text-green-400">{{ candidate.score }}</div>
+                {% elif candidate.score >= 40 %}
+                  <div class="text-2xl font-semibold text-yellow-400">{{ candidate.score }}</div>
+                {% else %}
+                  <div class="text-2xl font-semibold text-red-400">{{ candidate.score }}</div>
+                {% endif %}
+                <div class="text-sm text-gray-400">{{ candidate.verdict }}</div>
+                {% if candidate.status == "approved" %}
+                  <div class="rounded-full bg-green-500/15 px-2 py-1 text-xs text-green-300">approved</div>
+                {% endif %}
+              </div>
+
+              <h2 class="mt-3 break-words text-base font-medium text-gray-100">{{ candidate.title }}</h2>
+              <div class="mt-1 text-xs text-gray-500">
+                {{ candidate.indexer }}
+                {% if candidate.quality %} · {{ candidate.quality }}{% endif %}
+                {% if candidate.size %} · {{ candidate.size|filesizeformat }}{% endif %}
+                · {{ candidate.seeders|default:0 }} seeders
+                {% if candidate.release_data.tmdbId %} · tmdb:{{ candidate.release_data.tmdbId }}{% endif %}
+                {% if candidate.release_data.imdbId %} · imdb:{{ candidate.release_data.imdbId }}{% endif %}
+              </div>
+
+              <div class="mt-4 grid gap-4 md:grid-cols-2">
+                <div class="rounded-md bg-[#212529] p-3">
+                  <div class="text-xs font-medium uppercase tracking-wider text-green-300">Positive</div>
+                  <ul class="mt-1 list-disc pl-5 text-sm text-gray-300">
+                    {% for reason in candidate.score_reasons %}
+                      <li>{{ reason }}</li>
+                    {% empty %}
+                      <li class="text-gray-500">none</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                <div class="rounded-md bg-[#212529] p-3">
+                  <div class="text-xs font-medium uppercase tracking-wider text-red-300">Warnings</div>
+                  <ul class="mt-1 list-disc pl-5 text-sm text-gray-300">
+                    {% for warning in candidate.score_warnings %}
+                      <li>{{ warning }}</li>
+                    {% empty %}
+                      <li class="text-gray-500">none</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </div>
+
+              {% if candidate.info_url %}
+                <a href="{{ candidate.info_url }}"
+                   target="_blank"
+                   rel="noreferrer"
+                   class="mt-3 inline-block text-sm text-indigo-300 hover:text-indigo-200">Open source</a>
+              {% endif %}
+            </div>
+
+            <form method="post"
+                  action="{% url 'release_approval_grab_movie' tmdb_id=item.tmdb_id %}"
+                  class="relative z-10 flex shrink-0 lg:w-32">
+              {% csrf_token %}
+              <input type="hidden" name="candidate_id" value="{{ candidate.id }}">
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit"
+                      class="w-full cursor-pointer rounded-md border border-indigo-500/50 bg-indigo-500/20 px-4 py-2 text-sm font-medium text-indigo-50 shadow-sm transition hover:bg-indigo-500/30 active:translate-y-px active:bg-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-400/70">
+                Approve
+              </button>
+            </form>
+          </div>
+        </article>
+      {% empty %}
+        <div class="rounded-md border border-[#2c3136] bg-[#1a1d20] px-4 py-8 text-center text-gray-400">
+          No acceptable releases found.
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock content %}
