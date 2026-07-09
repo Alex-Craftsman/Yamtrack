@@ -500,6 +500,23 @@ RADARR_API_KEY = config(
     "RADARR_API_KEY",
     default=secret("RADARR_API_KEY_FILE", default=""),
 )
+SONARR_URL = config("SONARR_URL", default="http://sonarr:8989")
+SONARR_API_KEY = config(
+    "SONARR_API_KEY",
+    default=secret("SONARR_API_KEY_FILE", default=""),
+)
+PROWLARR_URL = config("PROWLARR_URL", default="")
+PROWLARR_API_KEY = config(
+    "PROWLARR_API_KEY",
+    default=secret("PROWLARR_API_KEY_FILE", default=""),
+)
+QBIT_URL = config("QBIT_URL", default="")
+QBIT_USER = config("QBIT_USER", default="")
+QBIT_PASS = config(
+    "QBIT_PASS",
+    default=secret("QBIT_PASS_FILE", default=""),
+)
+QBIT_SONARR_CATEGORY = config("QBIT_SONARR_CATEGORY", default="tv-sonarr")
 RELEASE_APPROVAL_REQUEST_TAKE = config(
     "RELEASE_APPROVAL_REQUEST_TAKE",
     default=100,

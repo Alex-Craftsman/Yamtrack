@@ -10,7 +10,7 @@
       <div>
         <h1 class="text-2xl font-semibold text-gray-100">Release Approval</h1>
         <p class="text-sm text-gray-400 mt-1">
-          Movie requests from Seerr with Radarr download approval.
+          Seerr requests with download approval.
         </p>
       </div>
       <form method="post" action="{% url 'release_approval_refresh_requests' %}">
@@ -24,13 +24,15 @@
 
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {% for item in rows %}
-        <a href="{% url 'release_approval_movie' tmdb_id=item.tmdb_id %}"
-           class="group block overflow-hidden rounded-lg border border-[#2c3136] bg-[#1a1d20] transition hover:border-indigo-500/60 hover:bg-[#20242a] focus:outline-none focus:ring-2 focus:ring-indigo-500/60">
+        <div class="group overflow-hidden rounded-lg border border-[#2c3136] bg-[#1a1d20] transition hover:border-indigo-500/60 hover:bg-[#20242a]">
           <div class="flex min-h-20 items-start justify-between gap-3 p-4">
             <div class="min-w-0">
-              <h2 class="line-clamp-2 text-lg font-semibold leading-6 text-gray-100">{{ item.title }}</h2>
+              <a href="{{ item.approval_url }}"
+                 class="block focus:outline-none focus:ring-2 focus:ring-indigo-500/60">
+                <h2 class="line-clamp-2 text-lg font-semibold leading-6 text-gray-100 group-hover:text-indigo-200">{{ item.title }}</h2>
+              </a>
               <div class="mt-1 text-xs text-gray-500">
-                {% if item.year %}{{ item.year }} · {% endif %}tmdb:{{ item.tmdb_id }}
+                {{ item.type_label }}{% if item.year %} · {{ item.year }}{% endif %} · tmdb:{{ item.tmdb_id }}
               </div>
             </div>
             <div class="flex shrink-0 items-center gap-2">
@@ -41,20 +43,21 @@
               </span>
               {% if item.has_file %}
                 <span class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-400/30 bg-sky-500/15 text-sky-300"
-                      title="Radarr: has file"
-                      aria-label="Radarr: has file">
+                      title="{{ item.service_label }}: has file"
+                      aria-label="{{ item.service_label }}: has file">
                   {% include "app/icons/download.svg" with classes="h-4 w-4" %}
                 </span>
               {% else %}
                 <span class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-yellow-400/30 bg-yellow-500/15 text-yellow-300"
-                      title="Radarr: no file"
-                      aria-label="Radarr: no file">
+                      title="{{ item.service_label }}: no file"
+                      aria-label="{{ item.service_label }}: no file">
                   {% include "app/icons/clock.svg" with classes="h-4 w-4" %}
                 </span>
               {% endif %}
             </div>
           </div>
-          <div class="relative h-44 bg-[#2c3136]">
+          <a href="{{ item.approval_url }}"
+             class="relative block h-44 bg-[#2c3136] focus:outline-none focus:ring-2 focus:ring-indigo-500/60">
             {% if item.fanart_url %}
               <img src="{{ item.fanart_url }}"
                    alt=""
@@ -65,7 +68,7 @@
                    class="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]">
             {% endif %}
             <div class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#111318]/90 via-[#111318]/45 to-transparent"></div>
-          </div>
+          </a>
 
           <div class="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
             <div class="flex items-center gap-3">
@@ -74,9 +77,9 @@
               </span>
               <div>
                 <div class="font-medium text-gray-100">
-                  {{ item.visible_candidate_count }} / {{ item.total_candidate_count }} candidates
+                  {{ item.candidate_count_label }}
                 </div>
-                <div class="text-xs text-gray-500">visible after default filtering</div>
+                <div class="text-xs text-gray-500">{{ item.candidate_count_hint }}</div>
               </div>
             </div>
             <span class="inline-flex items-center gap-1.5 rounded-md bg-[#252a30] px-2.5 py-1.5 text-xs text-gray-300"
@@ -86,18 +89,31 @@
             </span>
           </div>
 
-          <div class="border-t border-[#2c3136] px-4 py-3 text-sm text-gray-300">
-            {% if item.latest_approved_candidate %}
-              <div class="truncate">{{ item.latest_approved_candidate.verdict }} · {{ item.latest_approved_candidate.score }}</div>
-              <div class="mt-1 text-xs text-gray-500">{{ item.latest_approved_candidate.approved_at }}</div>
-            {% else %}
-              <span class="text-gray-500">No approved release yet</span>
-            {% endif %}
+          <div class="flex items-center justify-between gap-3 border-t border-[#2c3136] px-4 py-3 text-sm text-gray-300">
+            <a href="{{ item.approval_url }}" class="min-w-0 flex-1 hover:text-gray-100">
+              {% if item.latest_approved_candidate %}
+                <div class="truncate">{{ item.latest_approved_candidate.verdict }} · {{ item.latest_approved_candidate.score }}</div>
+                <div class="mt-1 text-xs text-gray-500">{{ item.latest_approved_candidate.approved_at }}</div>
+              {% else %}
+                <span class="text-gray-500">No approved release yet</span>
+              {% endif %}
+            </a>
+            <form method="post"
+                  action="{% url 'release_approval_delete_item' item.id %}"
+                  onsubmit="return confirm('Remove this card from release approval?');">
+              {% csrf_token %}
+              <button type="submit"
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-400/25 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                      title="Delete card"
+                      aria-label="Delete {{ item.title }}">
+                {% include "app/icons/trashcan.svg" with classes="h-4 w-4" %}
+              </button>
+            </form>
           </div>
-        </a>
+        </div>
       {% empty %}
         <div class="rounded-md border border-[#2c3136] bg-[#1a1d20] px-4 py-8 text-center text-gray-400 md:col-span-2 xl:col-span-3">
-          No Seerr movie requests found.
+          No Seerr requests found.
         </div>
       {% endfor %}
     </div>

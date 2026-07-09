@@ -1948,6 +1948,7 @@ class ReleaseApprovalItem(models.Model):
     has_file = models.BooleanField(default=False)
     request_data = models.JSONField()
     movie_data = models.JSONField(default=dict)
+    dismissed_at = models.DateTimeField(null=True, blank=True)
     synced_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -1971,7 +1972,9 @@ class ReleaseApprovalCandidate(models.Model):
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
+        GRABBING = "grabbing", "Grabbing"
         APPROVED = "approved", "Approved"
+        FAILED = "failed", "Failed"
         REJECTED = "rejected", "Rejected"
 
     item = models.ForeignKey(
@@ -1991,6 +1994,7 @@ class ReleaseApprovalCandidate(models.Model):
     score_reasons = models.JSONField(default=list)
     score_warnings = models.JSONField(default=list)
     release_data = models.JSONField()
+    grab_error = models.TextField(blank=True)
     status = models.CharField(
         max_length=20,
         choices=Status,

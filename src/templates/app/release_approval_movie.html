@@ -22,14 +22,27 @@
           <div class="flex flex-wrap items-center justify-between gap-3">
             <a href="{% url 'release_approval_requests' %}"
                class="rounded-md bg-[#111318]/75 px-3 py-1.5 text-sm text-indigo-200 ring-1 ring-white/10 hover:bg-[#111318]">Back to requests</a>
-            <form method="post"
-                  action="{% url 'release_approval_refresh_movie' tmdb_id=item.tmdb_id %}">
-              {% csrf_token %}
-              <button type="submit"
-                      class="rounded-md border border-white/10 bg-[#111318]/75 px-3 py-1.5 text-sm text-gray-100 hover:bg-[#111318]">
-                Refresh candidates
-              </button>
-            </form>
+            <div class="flex items-center gap-2">
+              <form method="post"
+                    action="{{ refresh_url }}">
+                {% csrf_token %}
+                <button type="submit"
+                        class="rounded-md border border-white/10 bg-[#111318]/75 px-3 py-1.5 text-sm text-gray-100 hover:bg-[#111318]">
+                  Refresh candidates
+                </button>
+              </form>
+              <form method="post"
+                    action="{{ delete_url }}"
+                    onsubmit="return confirm('Remove this card from release approval?');">
+                {% csrf_token %}
+                <button type="submit"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-400/25 bg-red-500/10 text-red-200 hover:bg-red-500/20"
+                        title="Delete card"
+                        aria-label="Delete card">
+                  {% include "app/icons/trashcan.svg" with classes="h-4 w-4" %}
+                </button>
+              </form>
+            </div>
           </div>
 
           <div class="max-w-4xl">
@@ -37,7 +50,11 @@
               {% if item.year %}
                 <span class="rounded-full bg-[#111318]/75 px-3 py-1 text-xs text-gray-200 ring-1 ring-white/10">{{ item.year }}</span>
               {% endif %}
+              <span class="rounded-full bg-[#111318]/75 px-3 py-1 text-xs text-gray-200 ring-1 ring-white/10">{{ media_label }} / {{ service_label }}</span>
               <span class="rounded-full bg-[#111318]/75 px-3 py-1 text-xs text-gray-200 ring-1 ring-white/10">tmdb:{{ item.tmdb_id }}</span>
+              {% if requested_seasons %}
+                <span class="rounded-full bg-[#111318]/75 px-3 py-1 text-xs text-gray-200 ring-1 ring-white/10">S{{ requested_seasons|join:", S" }}</span>
+              {% endif %}
               {% if item.has_file %}
                 <span class="rounded-full bg-green-500/20 px-3 py-1 text-xs text-green-200 ring-1 ring-green-400/25">has file</span>
               {% else %}
@@ -75,6 +92,51 @@
               </div>
             {% endif %}
           {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if downloaded_summary %}
+      <div class="mb-6 rounded-md border border-green-500/20 bg-green-500/5 p-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 class="text-sm font-medium uppercase tracking-wider text-green-300">Downloaded by {{ service_label }}</h2>
+            <div class="mt-2 text-sm text-gray-300">
+              {{ downloaded_summary.file_count }} files
+              {% if downloaded_summary.seasons %} · S{{ downloaded_summary.seasons|join:", S" }}{% endif %}
+              {% if downloaded_summary.qualities %} · {{ downloaded_summary.qualities|join:", " }}{% endif %}
+              {% if downloaded_summary.size %} · {{ downloaded_summary.size|filesizeformat }}{% endif %}
+            </div>
+            {% if downloaded_summary.release_groups %}
+              <div class="mt-1 text-xs text-gray-500">{{ downloaded_summary.release_groups|join:", " }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="mt-4 grid gap-3 lg:grid-cols-2">
+          <div class="rounded-md bg-[#172018] p-3">
+            <div class="text-xs font-medium uppercase tracking-wider text-green-300">Latest files</div>
+            <div class="mt-2 space-y-1">
+              {% for file in downloaded_summary.latest_files %}
+                <div class="truncate text-sm text-gray-300">
+                  {% if file.seasonNumber %}S{{ file.seasonNumber }} · {% endif %}{{ file.sceneName|default:file.relativePath }}
+                </div>
+              {% empty %}
+                <div class="text-sm text-gray-500">none</div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="rounded-md bg-[#172018] p-3">
+            <div class="text-xs font-medium uppercase tracking-wider text-green-300">Latest imports</div>
+            <div class="mt-2 space-y-1">
+              {% for record in downloaded_summary.latest_imports %}
+                <div class="truncate text-sm text-gray-300">
+                  {{ record.sourceTitle }}
+                </div>
+              {% empty %}
+                <div class="text-sm text-gray-500">none</div>
+              {% endfor %}
+            </div>
+          </div>
         </div>
       </div>
     {% endif %}
@@ -177,7 +239,7 @@
         </div>
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <button type="submit" class="rounded-md border border-indigo-500/40 bg-indigo-500/15 px-3 py-1.5 text-sm text-indigo-100 hover:bg-indigo-500/25">Apply filters</button>
-          <a href="{% url 'release_approval_movie' tmdb_id=item.tmdb_id %}" class="rounded-md border border-[#3a4149] bg-[#2c3136] px-3 py-1.5 text-sm text-gray-100 hover:bg-[#343a42]">Reset</a>
+          <a href="{{ reset_url }}" class="rounded-md border border-[#3a4149] bg-[#2c3136] px-3 py-1.5 text-sm text-gray-100 hover:bg-[#343a42]">Reset</a>
         </div>
       </form>
     </details>
@@ -198,6 +260,10 @@
                 <div class="text-sm text-gray-400">{{ candidate.verdict }}</div>
                 {% if candidate.status == "approved" %}
                   <div class="rounded-full bg-green-500/15 px-2 py-1 text-xs text-green-300">approved</div>
+                {% elif candidate.status == "grabbing" %}
+                  <div class="rounded-full bg-indigo-500/15 px-2 py-1 text-xs text-indigo-300">sending</div>
+                {% elif candidate.status == "failed" %}
+                  <div class="rounded-full bg-red-500/15 px-2 py-1 text-xs text-red-300">failed</div>
                 {% endif %}
               </div>
 
@@ -240,17 +306,23 @@
                    rel="noreferrer"
                    class="mt-3 inline-block text-sm text-indigo-300 hover:text-indigo-200">Open source</a>
               {% endif %}
+              {% if candidate.grab_error %}
+                <div class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
+                  {{ candidate.grab_error }}
+                </div>
+              {% endif %}
             </div>
 
             <form method="post"
-                  action="{% url 'release_approval_grab_movie' tmdb_id=item.tmdb_id %}"
+                  action="{{ grab_url }}"
                   class="relative z-10 flex shrink-0 lg:w-32">
               {% csrf_token %}
               <input type="hidden" name="candidate_id" value="{{ candidate.id }}">
               <input type="hidden" name="next" value="{{ request.get_full_path }}">
               <button type="submit"
-                      class="w-full cursor-pointer rounded-md border border-indigo-500/50 bg-indigo-500/20 px-4 py-2 text-sm font-medium text-indigo-50 shadow-sm transition hover:bg-indigo-500/30 active:translate-y-px active:bg-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-400/70">
-                Approve
+                      {% if candidate.status == "grabbing" %}disabled{% endif %}
+                      class="w-full cursor-pointer rounded-md border border-indigo-500/50 bg-indigo-500/20 px-4 py-2 text-sm font-medium text-indigo-50 shadow-sm transition hover:bg-indigo-500/30 active:translate-y-px active:bg-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-400/70 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-indigo-500/20">
+                {% if candidate.status == "grabbing" %}Sending{% else %}Approve{% endif %}
               </button>
             </form>
           </div>

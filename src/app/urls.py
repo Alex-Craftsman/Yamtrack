@@ -102,6 +102,11 @@ urlpatterns = [
         name="release_approval_refresh_requests",
     ),
     path(
+        "release-approval/<int:item_id>/delete",
+        views.release_approval_delete_item,
+        name="release_approval_delete_item",
+    ),
+    path(
         "release-approval/movie/<int:tmdb_id>",
         views.release_approval_movie,
         name="release_approval_movie",
@@ -115,6 +120,21 @@ urlpatterns = [
         "release-approval/movie/<int:tmdb_id>/grab",
         views.release_approval_grab_movie,
         name="release_approval_grab_movie",
+    ),
+    path(
+        "release-approval/tv/<int:tmdb_id>",
+        views.release_approval_tv,
+        name="release_approval_tv",
+    ),
+    path(
+        "release-approval/tv/<int:tmdb_id>/refresh",
+        views.release_approval_refresh_tv,
+        name="release_approval_refresh_tv",
+    ),
+    path(
+        "release-approval/tv/<int:tmdb_id>/grab",
+        views.release_approval_grab_tv,
+        name="release_approval_grab_tv",
     ),
     path("serviceworker.js", views.service_worker, name="service_worker"),
 ]
